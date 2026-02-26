@@ -1,66 +1,81 @@
 ﻿<template>
-  <div class="app">
+  <div class="app min-h-screen">
     <WeatherBackground :condition="currentCondition" :icon="currentIcon" />
 
-    <div class="weather-shell">
-      <header class="app-head">
-        <div class="brand">
-          <div class="brand-mark">GW</div>
-          <div>
-            <h1>Weather Dashboard</h1>
-            <p>Live conditions and forecast</p>
+    <div class="weather-shell max-w-xl sm:max-w-2xl lg:max-w-4xl xl:max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 pb-24">
+      <section class="hero-panel">
+        <header class="app-head">
+          <div class="brand">
+            <div>
+              <h1
+                class="text-2xl sm:text-3xl font-semibold tracking-tight"
+                :class="isDarkMode ? 'text-white' : 'text-slate-800'"
+              >
+                Weather Dashboard
+              </h1>
+              <p
+                class="text-sm"
+                :class="isDarkMode ? 'text-white/70' : 'text-slate-600'"
+              >
+                Live conditions and forecast
+              </p>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <section class="controls">
-        <input
-          class="search"
-          type="text"
-          placeholder="Enter city name (search worldwide)..."
-          v-model="cityInput"
-          @keyup.enter="getWeather"
-        />
-        <button class="search-btn" @click="getWeather">Search</button>
-        <div class="unit-toggle" aria-label="Temperature unit toggle">
-          <button
-            type="button"
-            class="unit-btn"
-            :class="{ active: useCelsius }"
-            @click="useCelsius = true"
-          >
-            deg C
-          </button>
-          <button
-            type="button"
-            class="unit-btn"
-            :class="{ active: !useCelsius }"
-            @click="useCelsius = false"
-          >
-            deg F
-          </button>
-          <button
-            type="button"
-            class="unit-btn theme-toggle-btn"
-            :class="{ active: isDarkMode }"
-            @click="toggleTheme"
-            :aria-label="isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'"
-            :title="isDarkMode ? 'Light mode' : 'Dark mode'"
-          >
-            {{ isDarkMode ? 'Dark' : 'Light' }}
-          </button>
-        </div>
-        <div class="recent-searches" v-if="searchHistory.length">
-          <button
-            v-for="city in searchHistory"
-            :key="'recent-' + city"
-            type="button"
-            class="recent-chip"
-            @click="searchFromHistory(city)"
-          >
-            {{ city }}
-          </button>
-        </div>
+        <section class="controls">
+          <input
+            class="search"
+            type="text"
+            placeholder="Enter city name (search worldwide)..."
+            v-model="cityInput"
+            @keyup.enter="getWeather"
+          />
+          <button class="search-btn" @click="getWeather">Search</button>
+          <div class="unit-toggle" aria-label="Temperature unit toggle">
+            <button
+              type="button"
+              class="unit-btn"
+              :class="{ active: useCelsius }"
+              @click="useCelsius = true"
+            >
+              deg C
+            </button>
+            <button
+              type="button"
+              class="unit-btn"
+              :class="{ active: !useCelsius }"
+              @click="useCelsius = false"
+            >
+              deg F
+            </button>
+            <button
+              type="button"
+              class="unit-btn theme-toggle-btn"
+              :class="{ active: isDarkMode }"
+              @click="toggleTheme"
+              :aria-label="isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'"
+              :title="isDarkMode ? 'Light mode' : 'Dark mode'"
+            >
+              {{ isDarkMode ? 'Dark' : 'Light' }}
+            </button>
+          </div>
+          <div class="recent-searches" v-if="searchHistory.length">
+            <button
+              v-for="city in searchHistory"
+              :key="'recent-' + city"
+              type="button"
+              class="recent-chip"
+              @click="searchFromHistory(city)"
+            >
+              {{ city }}
+            </button>
+          </div>
+          <WeatherSourceBadge
+            :source="weatherSource"
+            :timestamp="weatherSourceTime"
+          />
+        </section>
       </section>
 
       <section v-if="!weatherStore.currentWeather && !weatherStore.error" class="empty-card">
@@ -80,150 +95,123 @@
         <div>
           <h2>Search for a city</h2>
           <p>Current weather, key metrics, and a 5-day hybrid forecast will appear here.</p>
+          <p v-if="geolocationDenied" class="meta-line">Location access denied. Search by city to continue.</p>
         </div>
       </section>
 
-      <transition v-else name="weather-swap" mode="out-in">
+      <section v-if="weatherStore.error && !weatherStore.currentWeather" class="empty-card">
+        <div>
+          <h2>Unable to load weather right now</h2>
+          <p>{{ weatherStore.error }}</p>
+          <p class="meta-line">Check your network, then try another city search.</p>
+        </div>
+      </section>
+
+      <BusinessImpact
+        v-if="weatherData && !weatherStore.error"
+        :weather="weatherData"
+      />
+
+      <transition v-if="weatherStore.currentWeather || weatherStore.error" name="weather-swap" mode="out-in">
       <section class="main-grid" :key="'main-' + weatherUpdateKey">
-        <article class="current-card">
-          <div class="card-title">
-            Current Weather
-            <span v-if="weatherStore.loading" class="loading-indicator" aria-live="polite">
-              <span class="loading-spinner" aria-hidden="true"></span>
-              Loading...
-            </span>
-          </div>
-          <transition name="fade-error">
-            <div v-if="weatherStore.error" class="error-banner" role="alert" aria-live="polite">
-              {{ weatherStore.error }}
-            </div>
-          </transition>
-          <div v-if="!weatherStore.error" class="current-layout">
-            <div class="sky-icon">
-              <div
-                class="icon main-weather-icon"
-                :class="mainWeatherIconClass"
-                v-html="iconSvg(weatherIcon)"
-              ></div>
-            </div>
-            <div class="current-meta">
-              <h2>{{ weatherStore.currentWeather.name }}</h2>
-              <p class="desc">{{ capitalize(weatherStore.currentWeather.weather[0].description) }}</p>
-              <p class="temp-big">
-                <transition name="temp-change" mode="out-in">
-                  <span :key="tempDisplayKey" class="temp-value">
-                    {{ toDisplayTemp(weatherStore.currentWeather.main.temp) }}&deg;{{ unitSymbol }}
-                  </span>
-                </transition>
-              </p>
-              <p class="meta-line">
-                Humidity: {{ weatherStore.currentWeather.main.humidity }}% |
-                Wind: {{ windDisplay(weatherStore.currentWeather.wind.speed) }}
-              </p>
-              <p class="meta-line">
-                Feels like: {{ toDisplayTemp(weatherStore.currentWeather.main.feels_like) }}&deg;{{ unitSymbol }} |
-                Pressure: {{ weatherStore.currentWeather.main.pressure }} hPa
-              </p>
-            </div>
-          </div>
-
-          <div v-if="!weatherStore.error" class="highlights">
-            <div class="highlight">
-              <span>Rain chance</span>
-              <strong>{{ rainChance(weatherStore.currentWeather) }}%</strong>
-            </div>
-            <div class="highlight">
-              <span>Visibility</span>
-              <strong>{{ visibilityKm(weatherStore.currentWeather.visibility) }} km</strong>
-            </div>
-            <div class="highlight">
-              <span>Real feel</span>
-              <strong>{{ toDisplayTemp(weatherStore.currentWeather.main.feels_like) }}&deg;{{ unitSymbol }}</strong>
-            </div>
-          </div>
-
-          <section class="hourly-forecast" v-if="hourlyForecast.length && !weatherStore.error">
-            <div class="hourly-title">Next 12 Hours</div>
-            <transition name="fade-update" mode="out-in">
-              <div class="hourly-scroll" :key="hourlyForecastKey">
-                <article
-                  class="hourly-card"
-                  v-for="(slot, index) in hourlyForecast"
-                  :key="'hour-' + index + '-' + slot.dt"
-                >
-                  <p class="hourly-time">{{ formatHour(slot.dt_txt) }}</p>
-                  <div class="icon" v-html="iconSvg(slot.weather[0].main)"></div>
-                  <p class="hourly-temp">{{ toDisplayTemp(slot.main.temp) }}&deg;{{ unitSymbol }}</p>
-                </article>
-              </div>
-            </transition>
-          </section>
-        </article>
-
-        <aside class="side-forecast" v-if="dailyForecast.length && !weatherStore.error">
-          <div class="card-title">
-            Daily Forecast
-            <span v-if="weatherStore.loading" class="loading-indicator" aria-live="polite">
-              <span class="loading-spinner" aria-hidden="true"></span>
-              Updating...
-            </span>
-          </div>
-          <div
-            class="side-row"
-            v-for="(day, index) in dailyForecast"
-            :key="'side-' + index"
-          >
-            <span class="side-day">{{ formatDay(day.dt_txt) }}</span>
-            <div class="icon" v-html="iconSvg(day.weather[0].main)"></div>
-            <span class="side-desc">{{ capitalize(day.weather[0].description) }}</span>
-            <span class="side-temp">
-              {{ toDisplayTemp(day.main.temp_max) }}&deg; / {{ toDisplayTemp(day.main.temp_min) }}&deg;
-            </span>
-          </div>
-        </aside>
+        <CurrentWeatherCard
+          :loading="weatherStore.loading"
+          :error="weatherStore.error"
+          :current-weather="weatherStore.currentWeather"
+          :main-weather-icon-class="mainWeatherIconClass"
+          :weather-icon="weatherIcon"
+          :temp-display-key="tempDisplayKey"
+          :unit-symbol="unitSymbol"
+          :hourly-forecast="hourlyForecast"
+          :impact-score="weatherStore.impactScore"
+          :trend-indicators="weatherStore.trendIndicators"
+          :activity-recommendations="weatherStore.activityRecommendations"
+          :hourly-forecast-key="hourlyForecastKey"
+          :to-display-temp="toDisplayTemp"
+          :capitalize="capitalize"
+          :wind-display="windDisplay"
+          :visibility-km="visibilityKm"
+          :rain-chance="rainChance"
+          :format-hour="formatHour"
+          :icon-svg="iconSvg"
+        />
       </section>
       </transition>
 
-      <transition name="weather-swap" mode="out-in">
-      <section class="cards-forecast" v-if="dailyForecast.length && !weatherStore.error" :key="'cards-' + weatherUpdateKey">
-        <h3>5-Day Forecast</h3>
-        <div class="cards-grid">
-          <article
-            class="day-card"
-            v-for="(day, index) in dailyForecast"
-            :key="'card-' + index"
-          >
-            <p class="day-name">{{ formatDay(day.dt_txt) }}</p>
-            <p class="day-date">{{ formatDate(day.dt_txt) }}</p>
-            <div class="icon" v-html="iconSvg(day.weather[0].main)"></div>
-            <p class="card-temp">{{ toDisplayTemp(day.main.temp) }}&deg;{{ unitSymbol }}</p>
-            <p class="card-desc">{{ capitalize(day.weather[0].description) }}</p>
-            <p class="card-rain">Rain {{ popPercent(day) }}%</p>
-          </article>
-        </div>
-      </section>
-      </transition>
+      <ForecastPanel
+        :daily-forecast="dailyForecast"
+        :weather-update-key="weatherUpdateKey"
+        :error="weatherStore.error"
+        :format-day="formatDay"
+        :icon-svg="iconSvg"
+        :capitalize="capitalize"
+        :to-display-temp="toDisplayTemp"
+        :unit-symbol="unitSymbol"
+      />
+
+      <WeatherTrendCharts
+        v-if="hourlyTrend.length && !weatherStore.error"
+        :points="hourlyTrend"
+        :unit-symbol="unitSymbol"
+      />
+
+      <InsightsPanel
+        :insights="weatherInsights"
+        :error="weatherStore.error"
+      />
+
+      <WeatherIntelligencePanel
+        v-if="weatherStore.currentWeather && !weatherStore.error"
+        :profile="weatherStore.productivityProfile"
+        :strategic-angle="weatherStore.strategicAngle"
+        :recommendations="weatherStore.businessRecommendations"
+        :error="weatherStore.error"
+      />
     </div>
+
+    <PerformanceBriefModal
+      :open="showPerformanceBrief"
+      :profile="weatherStore.productivityProfile"
+      :recommendations="weatherStore.businessRecommendations"
+      @open-dashboard="closePerformanceBrief"
+      @dismiss="closePerformanceBrief"
+    />
   </div>
 </template>
 
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useWeatherStore } from '@/stores/weather'
 import WeatherBackground from '@/components/WeatherBackground.vue'
+import BusinessImpact from '@/components/BusinessImpact.vue'
+import CurrentWeatherCard from '@/components/CurrentWeatherCard.vue'
+import ForecastPanel from '@/components/ForecastPanel.vue'
+import InsightsPanel from '@/components/InsightsPanel.vue'
+import WeatherSourceBadge from '@/components/WeatherSourceBadge.vue'
+import WeatherIntelligencePanel from '@/components/WeatherIntelligencePanel.vue'
+import PerformanceBriefModal from '@/components/PerformanceBriefModal.vue'
+import { getCurrentPosition } from '@/utils/geolocation'
+const WeatherTrendCharts = defineAsyncComponent(() => import('@/components/WeatherTrendCharts.vue'))
 
 const cityInput = ref('')
 const weatherStore = useWeatherStore()
 const useCelsius = ref(true)
 const isDarkMode = ref(true)
 const searchHistory = ref([])
+const geolocationDenied = ref(false)
+const showPerformanceBrief = ref(false)
 
 const THEME_STORAGE_KEY = 'weather-theme-mode'
 const SEARCH_HISTORY_KEY = 'weather-search-history'
+const PERFORMANCE_BRIEF_SESSION_KEY = 'weather-performance-brief-shown'
 
 const unitSymbol = computed(() => (useCelsius.value ? 'C' : 'F'))
 const hourlyForecast = computed(() => weatherStore.hourlyForecast)
+const hourlyTrend = computed(() => weatherStore.hourlyTrend)
+const weatherInsights = computed(() => weatherStore.insights || [])
+const weatherSource = computed(() => weatherStore.lastSource)
+const weatherSourceTime = computed(() => weatherStore.lastUpdatedAt)
 const hourlyForecastKey = computed(() => hourlyForecast.value.map((slot) => slot.dt).join('-'))
 const weatherUpdateKey = computed(() => `${weatherStore.currentWeather?.dt ?? 'none'}-${weatherStore.currentWeather?.name ?? 'none'}-${weatherStore.error ?? 'ok'}`)
 const tempDisplayKey = computed(() => `${weatherStore.currentWeather?.dt ?? 'none'}-${weatherStore.currentWeather?.main?.temp ?? 'none'}-${unitSymbol.value}`)
@@ -243,6 +231,26 @@ const weatherIcon = computed(() => {
   }
   return map[currentCondition.value] || 'Clear'
 })
+const weatherData = computed(() => {
+  const current = weatherStore.currentWeather
+  if (!current) return null
+
+  return {
+    temperature: Number(current.main?.temp ?? 0),
+    rainProbability: Math.round((weatherStore.hourlyForecast?.[0]?.pop ?? 0) * 100),
+    windSpeed: Number(current.wind?.speed ?? 0),
+    humidity: Number(current.main?.humidity ?? 0)
+  }
+})
+const isPerformanceBriefReady = computed(() => {
+  return Boolean(
+    weatherStore.currentWeather &&
+    !weatherStore.loading &&
+    !weatherStore.error &&
+    weatherStore.productivityProfile?.label &&
+    weatherStore.businessRecommendations?.length
+  )
+})
 const mainWeatherIconClass = computed(() => {
   const animationMap = {
     Clear: 'is-clear',
@@ -258,13 +266,33 @@ const mainWeatherIconClass = computed(() => {
   return animationMap[currentCondition.value] || 'is-clear'
 })
 
-const dailyForecast = computed(() => {
-  const groups = new Map()
-  for (const slot of weatherStore.forecast) {
-    const key = slot.dt_txt.slice(0, 10)
-    if (!groups.has(key)) groups.set(key, slot)
+function setFaviconFromWeather(condition) {
+  if (typeof document === 'undefined') return
+
+  const iconMap = {
+    Clear: '☀️',
+    Clouds: '☁️',
+    Rain: '🌧️',
+    Drizzle: '🌧️',
+    Thunderstorm: '⛈️',
+    Snow: '❄️'
   }
-  return Array.from(groups.values()).slice(0, 5)
+
+  const emoji = iconMap[condition] || '☀️'
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">${emoji}</text></svg>`
+  const href = `data:image/svg+xml,${encodeURIComponent(svg)}`
+
+  let favicon = document.querySelector("link[rel='icon']")
+  if (!favicon) {
+    favicon = document.createElement('link')
+    favicon.setAttribute('rel', 'icon')
+    document.head.appendChild(favicon)
+  }
+  favicon.setAttribute('href', href)
+}
+
+const dailyForecast = computed(() => {
+  return weatherStore.forecast.slice(0, 5)
 })
 
 function normalizeCity(city) {
@@ -348,24 +376,21 @@ async function searchFromHistory(city) {
 }
 
 async function requestInitialWeather() {
-  if (!navigator.geolocation) {
-    weatherStore.fetchWeather('London')
-    return
-  }
+  const position = await getCurrentPosition().catch((error) => {
+    geolocationDenied.value = error?.code === 1
+    console.error('[app] Geolocation unavailable, falling back to city search', error)
+    return null
+  })
 
-  const position = await new Promise((resolve, reject) => {
-    navigator.geolocation.getCurrentPosition(resolve, reject)
-  }).catch(() => null)
-
-  if (position?.coords) {
+  if (position?.coords?.latitude != null && position?.coords?.longitude != null) {
     await weatherStore.fetchWeatherByCoords(position.coords.latitude, position.coords.longitude)
     if (!weatherStore.currentWeather) {
-      weatherStore.fetchWeather('London')
+      await weatherStore.fetchWeather('London')
     }
     return
   }
 
-  weatherStore.fetchWeather('London')
+  await weatherStore.fetchWeather('London')
 }
 
 function applyTheme(isDark) {
@@ -388,14 +413,44 @@ function initTheme() {
   applyTheme(isDarkMode.value)
 }
 
+function closePerformanceBrief() {
+  showPerformanceBrief.value = false
+}
+
 onMounted(() => {
   initTheme()
   loadSearchHistory()
   requestInitialWeather()
 })
 
+watch(
+  () => currentCondition.value,
+  (condition) => {
+    setFaviconFromWeather(condition)
+  },
+  { immediate: true }
+)
+
+watch(
+  () => isPerformanceBriefReady.value,
+  (ready) => {
+    if (!ready) return
+    if (sessionStorage.getItem(PERFORMANCE_BRIEF_SESSION_KEY) === '1') return
+    sessionStorage.setItem(PERFORMANCE_BRIEF_SESSION_KEY, '1')
+    showPerformanceBrief.value = true
+  }
+)
+
+watch(
+  () => showPerformanceBrief.value,
+  (open) => {
+    document.body.style.overflow = open ? 'hidden' : ''
+  }
+)
+
 onBeforeUnmount(() => {
   clearDebouncedSearch()
+  document.body.style.overflow = ''
 })
 
 function toDate(value) {
@@ -404,10 +459,6 @@ function toDate(value) {
 
 function formatDay(value) {
   return toDate(value).toLocaleDateString([], { weekday: 'short' })
-}
-
-function formatDate(value) {
-  return toDate(value).toLocaleDateString([], { month: 'short', day: 'numeric' })
 }
 
 function formatHour(value) {
@@ -444,11 +495,7 @@ function rainChance(currentWeather) {
   if (rainVolume != null) {
     return Math.min(100, Math.round(rainVolume * 20))
   }
-  return popPercent(weatherStore.forecast[0] || {})
-}
-
-function showRain(main) {
-  return ['Rain', 'Drizzle', 'Thunderstorm'].includes(main)
+  return popPercent(weatherStore.hourlyForecast[0] || {})
 }
 
 function iconSvg(main) {
@@ -530,7 +577,7 @@ function iconSvg(main) {
 }
 </script>
 
-<style scoped>
+<style>
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;500;700;800&display=swap');
 
 * {
@@ -545,14 +592,19 @@ function iconSvg(main) {
   --line: rgba(10, 38, 75, 0.16);
   --accent: #27c063;
   --btn: #d6e7ff;
-  min-height: 100vh;
+  min-height: 100svh;
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: visible;
   color: var(--text);
   font-family: 'Manrope', sans-serif;
-  padding: 22px;
-  display: grid;
-  place-items: center;
+  padding-top: calc(16px + env(safe-area-inset-top));
+  padding-right: calc(16px + env(safe-area-inset-right));
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  padding-left: calc(16px + env(safe-area-inset-left));
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .sky-bg {
@@ -626,7 +678,7 @@ function iconSvg(main) {
   opacity: 0;
 }
 
-:global(html.dark) .app {
+html.dark .app {
   --text: #f5fbff;
   --muted: rgba(238, 246, 255, 0.88);
   --glass: rgba(5, 18, 44, 0.78);
@@ -636,7 +688,7 @@ function iconSvg(main) {
   --btn: #23314f;
 }
 
-:global(html.dark) .sky-bg {
+html.dark .sky-bg {
   background:
     radial-gradient(circle at 15% 18%, rgba(255, 195, 133, 0.55), transparent 36%),
     radial-gradient(circle at 64% 20%, rgba(255, 183, 128, 0.48), transparent 34%),
@@ -714,8 +766,9 @@ function iconSvg(main) {
 .weather-shell {
   position: relative;
   z-index: 1;
-  width: min(1160px, 100%);
-  padding: 24px;
+  width: 100%;
+  max-width: 100%;
+  padding-top: 20px;
   border-radius: 26px;
   background: rgba(6, 16, 34, 0.62);
   border: 1px solid var(--line);
@@ -728,7 +781,16 @@ function iconSvg(main) {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
+}
+
+.hero-panel {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 12px 24px rgba(4, 13, 28, 0.18);
 }
 
 .brand {
@@ -853,18 +915,26 @@ function iconSvg(main) {
 
 .main-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: 1fr;
   gap: 16px;
   margin-bottom: 20px;
 }
 
 .current-card,
-.side-forecast,
 .cards-forecast {
   background: var(--glass);
   border: 1px solid var(--line);
   border-radius: 22px;
   padding: 20px;
+}
+
+.current-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .card-title {
@@ -907,31 +977,42 @@ function iconSvg(main) {
   font-size: 0.92rem;
 }
 
-:global(html:not(.dark)) .loading-spinner {
+html:not(.dark) .loading-spinner {
   border-color: rgba(10, 38, 75, 0.2);
   border-top-color: var(--accent);
 }
 
 .current-layout {
   display: grid;
-  grid-template-columns: 200px 1fr;
-  gap: 12px;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  order: 1;
+  min-width: 0;
 }
 
-.current-meta h2 {
+.current-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.current-location {
+  order: 1;
   margin: 0 0 4px;
   font-size: clamp(1.7rem, 2.4vw, 2.2rem);
   line-height: 1.1;
 }
 
-.desc {
+.current-condition {
+  order: 2;
   margin: 0 0 2px;
   color: var(--muted);
   font-size: 0.98rem;
   font-weight: 500;
 }
 
-.temp-big {
+.current-temp {
+  order: 3;
   margin: 10px 0 8px;
   font-size: clamp(2.6rem, 6vw, 4.1rem);
   line-height: 0.95;
@@ -940,6 +1021,7 @@ function iconSvg(main) {
 }
 
 .meta-line {
+  order: 4;
   margin: 4px 0;
   color: var(--text);
 }
@@ -953,6 +1035,7 @@ function iconSvg(main) {
 
 .hourly-forecast {
   margin-top: 14px;
+  order: 3;
 }
 
 .hourly-title {
@@ -1016,6 +1099,10 @@ function iconSvg(main) {
   gap: 4px;
 }
 
+.mobile-low-priority {
+  order: 2;
+}
+
 .highlight span {
   color: var(--muted);
   font-size: 0.82rem;
@@ -1025,81 +1112,51 @@ function iconSvg(main) {
   font-size: 1.05rem;
 }
 
-.side-forecast {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.side-row {
-  display: grid;
-  grid-template-columns: 42px 34px 1fr auto;
-  gap: 8px;
-  align-items: center;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
-}
-
-.side-row:last-child {
-  border-bottom: none;
-}
-
-.side-day {
-  font-weight: 700;
-}
-
-.side-desc,
-.side-temp {
-  color: var(--text);
-  font-size: 0.82rem;
-}
-
 .cards-forecast h3 {
   margin: 0 0 12px;
   font-size: 2rem;
   text-align: center;
 }
 
-.cards-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 12px;
+.forecast-list {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.day-card {
-  background: rgba(24, 52, 91, 0.65);
-  border-radius: 16px;
-  padding: 14px;
-  display: grid;
-  justify-items: center;
-  text-align: center;
-  gap: 5px;
-  transition: transform 0.24s ease, box-shadow 0.24s ease;
+.forecast-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.day-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 10px 24px rgba(8, 22, 44, 0.22);
-}
-
-.day-name {
+.forecast-day {
   margin: 0;
-  font-size: 1.05rem;
+  min-width: 44px;
+  font-size: 0.92rem;
   font-weight: 700;
 }
 
-.day-date,
-.card-desc,
-.card-rain {
-  margin: 0;
-  color: var(--text);
-  font-size: 0.9rem;
+.forecast-icon svg {
+  width: 22px;
+  height: 22px;
 }
 
-.card-temp {
+.forecast-desc {
   margin: 0;
-  font-size: 2rem;
-  font-weight: 800;
+  font-size: 0.84rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.forecast-temp {
+  margin: 0 0 0 auto;
+  font-size: 0.88rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .temp-value {
@@ -1465,19 +1522,25 @@ function iconSvg(main) {
   .main-grid {
     grid-template-columns: 1fr;
   }
-
-  .cards-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 760px) {
   .app {
-    padding: 14px;
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding-top: calc(10px + env(safe-area-inset-top));
+    padding-right: calc(10px + env(safe-area-inset-right));
+    padding-bottom: calc(80px + env(safe-area-inset-bottom));
+    padding-left: calc(10px + env(safe-area-inset-left));
   }
 
   .weather-shell {
-    padding: 16px;
+    padding-top: 14px;
+  }
+
+  .hero-panel {
+    padding: 14px;
+    border-radius: 12px;
   }
 
   .controls {
@@ -1494,45 +1557,132 @@ function iconSvg(main) {
 
   .highlights {
     grid-template-columns: 1fr;
+    gap: 8px;
+    margin-top: 10px;
   }
 
-  .cards-grid {
-    display: flex;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    -webkit-overflow-scrolling: touch;
-    gap: 10px;
-    padding-bottom: 2px;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
+  .highlight {
+    padding: 8px;
   }
 
-  .cards-grid::-webkit-scrollbar {
-    display: none;
+  .highlight strong {
+    font-size: 0.98rem;
   }
 
-  .day-card {
-    flex: 0 0 auto;
-    min-width: min(220px, 70vw);
-    scroll-snap-align: start;
+  .controls {
+    margin-bottom: 12px;
+  }
+
+  .main-grid {
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .current-card,
+  .cards-forecast {
+    padding: 14px;
+  }
+
+  .current-location {
+    order: 3;
+    font-size: 1.5rem;
+    margin-bottom: 2px;
+  }
+
+  .current-condition {
+    order: 2;
+    font-size: 0.9rem;
+  }
+
+  .current-temp {
+    order: 1;
+    font-size: clamp(2.2rem, 12vw, 3.2rem);
+    margin: 8px 0 6px;
+  }
+
+  .meta-line {
+    font-size: 0.9rem;
   }
 
   .cards-forecast h3 {
     font-size: 1.5rem;
   }
+
+  .cards-forecast {
+    border-radius: 16px;
+  }
+
+  .hourly-forecast {
+    margin-top: 10px;
+    order: 2;
+  }
+
+  .mobile-low-priority {
+    order: 3;
+  }
+
+  .hourly-scroll {
+    max-height: 132px;
+  }
+
+  .hourly-card {
+    min-width: 86px;
+    padding: 8px;
+    gap: 3px;
+  }
+
+  .hourly-time {
+    font-size: 0.75rem;
+  }
+
+  .hourly-temp {
+    font-size: 0.9rem;
+  }
+
+  .forecast-row {
+    min-height: 52px;
+    padding: 8px 0;
+    gap: 8px;
+  }
+
+  .forecast-day {
+    min-width: 40px;
+    font-size: 0.84rem;
+  }
+
+  .forecast-icon svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .forecast-desc {
+    font-size: 0.78rem;
+  }
+
+  .forecast-temp {
+    font-size: 0.8rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .current-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 24px;
+  }
 }
 
 @media (max-width: 520px) {
-  .day-card {
-    min-width: 78vw;
+  .hourly-scroll {
+    max-height: 122px;
   }
 
-  .side-row {
-    grid-template-columns: 35px 32px 1fr;
+  .cards-forecast {
+    border-radius: 14px;
   }
+}
 
-  .side-temp {
-    grid-column: 3;
-  }
+html, body, #app {
+  overflow-x: hidden;
+  width: 100%;
 }
 </style>

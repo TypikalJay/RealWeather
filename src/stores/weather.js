@@ -1,105 +1,131 @@
 import { defineStore } from 'pinia'
+import { fetchWeatherBundle } from '@/services/weatherApi'
+import { normalizeWeather } from '@/services/weatherNormalizer'
+import { generateWeatherInsights } from '@/services/weatherInsights'
+import {
+  calculateImpactScore,
+  computeTrendIndicators,
+  generateActivityRecommendations
+} from '@/services/weatherProductMetrics'
+import {
+  buildBusinessRecommendations,
+  buildProductivityProfile,
+  buildStrategicAngle
+} from '@/services/weatherIntelligence'
+
+let activeRequestId = 0
+let activeController = null
 
 export const useWeatherStore = defineStore('weather', {
   state: () => ({
     currentWeather: null,
     forecast: [],
     hourlyForecast: [],
+    hourlyTrend: [],
+    insights: [],
+    impactScore: {
+      score: 0,
+      label: 'Severe'
+    },
+    activityRecommendations: [],
+    trendIndicators: {
+      temperature: 'flat',
+      humidity: 'flat'
+    },
+    productivityProfile: {
+      label: 'Strategic Day',
+      confidence: 0,
+      reasoning: ''
+    },
+    businessRecommendations: [],
+    strategicAngle: '',
     loading: false,
-    error: null
+    error: null,
+    lastSource: null,
+    lastUpdatedAt: null
   }),
 
   actions: {
-    async fetchWeather(city) {
+    async fetchWeatherByParams(params) {
       const apiKey = import.meta.env.VITE_WEATHER_API_KEY
+      const requestId = ++activeRequestId
+
+      if (activeController) {
+        activeController.abort()
+      }
+      activeController = new AbortController()
+
+      this.loading = true
+      this.error = null
 
       try {
-        this.loading = true
-        this.error = null
+        const bundle = await fetchWeatherBundle(params, apiKey, {
+          signal: activeController.signal
+        })
 
-        const currentRes = await fetch(
-          `https://api.openweathermap.org/data/2.5/weather?q=${city}&units=metric&appid=${apiKey}`
-        )
-
-        const currentData = await currentRes.json()
-
-        if (!currentRes.ok) {
-          if (currentRes.status === 404) {
-            throw new Error('City not found. Please try another location.')
-          }
-          throw new Error(currentData.message || 'Unable to fetch weather data.')
+        if (requestId !== activeRequestId) {
+          return
         }
 
-        this.currentWeather = currentData
+        const normalized = normalizeWeather(bundle.current, bundle.forecast)
 
-        const forecastRes = await fetch(
-          `https://api.openweathermap.org/data/2.5/forecast?q=${city}&units=metric&appid=${apiKey}`
-        )
-
-        const forecastData = await forecastRes.json()
-
-        if (!forecastRes.ok) {
-          throw new Error(forecastData.message || 'Unable to fetch forecast data.')
-        }
-
-        this.forecast = forecastData.list.filter((_, index) => index % 8 === 0)
-        this.hourlyForecast = forecastData.list.slice(0, 4)
+        this.currentWeather = normalized.current
+        this.forecast = normalized.dailySummaries
+        this.hourlyForecast = normalized.hourlyNext12
+        this.hourlyTrend = normalized.hourlyNext24
+        this.insights = generateWeatherInsights(normalized)
+        this.impactScore = calculateImpactScore(normalized)
+        this.trendIndicators = computeTrendIndicators(normalized)
+        this.activityRecommendations = generateActivityRecommendations(normalized, this.insights)
+        this.productivityProfile = buildProductivityProfile({
+          normalizedWeather: normalized,
+          impactScore: this.impactScore,
+          insights: this.insights
+        })
+        this.businessRecommendations = buildBusinessRecommendations({
+          normalizedWeather: normalized,
+          impactScore: this.impactScore,
+          insights: this.insights
+        })
+        this.strategicAngle = buildStrategicAngle({
+          profile: this.productivityProfile,
+          recommendations: this.businessRecommendations
+        })
+        this.lastSource = bundle.source || 'network'
+        this.lastUpdatedAt = bundle.servedAt ?? Date.now()
       } catch (error) {
+        if (error?.name === 'AbortError') {
+          return
+        }
+
+        if (requestId !== activeRequestId) {
+          return
+        }
+
         if (error instanceof TypeError) {
           this.error = 'Network error. Check your connection and try again.'
         } else {
-          this.error = error.message || 'Something went wrong while fetching weather data.'
+          this.error = error?.message || 'Something went wrong while fetching weather data.'
         }
-        console.error('Weather fetch error:', error)
+
+        console.error('[weather-store] fetch failed', {
+          params,
+          message: error?.message,
+          error
+        })
       } finally {
-        this.loading = false
+        if (requestId === activeRequestId) {
+          this.loading = false
+        }
       }
     },
 
+    async fetchWeather(city) {
+      return this.fetchWeatherByParams({ q: city })
+    },
+
     async fetchWeatherByCoords(lat, lon) {
-      const apiKey = import.meta.env.VITE_WEATHER_API_KEY
-
-      try {
-        this.loading = true
-        this.error = null
-
-        const currentRes = await fetch(
-          `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${apiKey}`
-        )
-
-        const currentData = await currentRes.json()
-
-        if (!currentRes.ok) {
-          if (currentRes.status === 404) {
-            throw new Error('Location not found. Please try a different search.')
-          }
-          throw new Error(currentData.message || 'Unable to fetch location weather.')
-        }
-
-        this.currentWeather = currentData
-
-        const forecastRes = await fetch(
-          `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=metric&appid=${apiKey}`
-        )
-
-        const forecastData = await forecastRes.json()
-
-        if (!forecastRes.ok) {
-          throw new Error(forecastData.message || 'Unable to fetch forecast data.')
-        }
-
-        this.forecast = forecastData.list.filter((_, index) => index % 8 === 0)
-        this.hourlyForecast = forecastData.list.slice(0, 4)
-      } catch (error) {
-        if (error instanceof TypeError) {
-          this.error = 'Network error. Check your connection and try again.'
-        } else {
-          this.error = error.message || 'Something went wrong while fetching weather data.'
-        }
-        console.error('Weather fetch by coordinates error:', error)
-      } finally {
-        this.loading = false
-      }
+      return this.fetchWeatherByParams({ lat: String(lat), lon: String(lon) })
     }
   }
 })

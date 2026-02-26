@@ -67,6 +67,24 @@
 
           <div v-if="isRainLike" class="condition-layer rain-layer">
             <span
+              class="cloud-shape storm-cloud layer-far"
+              v-for="item in rainCloudsFar"
+              :key="item.id"
+              :style="item.style"
+            ></span>
+            <span
+              class="cloud-shape storm-cloud layer-mid"
+              v-for="item in rainCloudsMid"
+              :key="item.id"
+              :style="item.style"
+            ></span>
+            <span
+              class="cloud-shape storm-cloud layer-front"
+              v-for="item in rainCloudsFront"
+              :key="item.id"
+              :style="item.style"
+            ></span>
+            <span
               class="rain-drop layer-far"
               v-for="item in rainFar"
               :key="item.id"
@@ -159,7 +177,7 @@ function cloudSet(count, prefix, durationRange, opacityRange, scaleRange) {
   )
 }
 
-function rainSet(count, prefix, durationRange, opacityRange, lengthRange, driftRange, tiltRange) {
+function rainSet(count, prefix, durationRange, opacityRange, lengthRange) {
   return createItems(
     count,
     () => ({
@@ -167,9 +185,7 @@ function rainSet(count, prefix, durationRange, opacityRange, lengthRange, driftR
       '--duration': `${rand(durationRange[0], durationRange[1]).toFixed(2)}s`,
       '--delay': `${-rand(0, 30).toFixed(2)}s`,
       '--opacity': rand(opacityRange[0], opacityRange[1]).toFixed(2),
-      '--length': `${rand(lengthRange[0], lengthRange[1]).toFixed(2)}px`,
-      '--drift': `${rand(driftRange[0], driftRange[1]).toFixed(2)}px`,
-      '--tilt': `${rand(tiltRange[0], tiltRange[1]).toFixed(2)}deg`
+      '--length': `${rand(lengthRange[0], lengthRange[1]).toFixed(2)}px`
     }),
     prefix
   )
@@ -236,9 +252,13 @@ const cloudsFar = cloudSet(7, 'clouds-far', [22, 30], [0.16, 0.34], [0.9, 1.35])
 const cloudsMid = cloudSet(6, 'clouds-mid', [15, 25], [0.2, 0.42], [0.8, 1.2])
 const cloudsFront = cloudSet(5, 'clouds-front', [10, 20], [0.24, 0.52], [0.72, 1.05])
 
-const rainFar = rainSet(38, 'rain-far', [22, 30], [0.16, 0.34], [10, 17], [6, 13], [7, 14])
-const rainMid = rainSet(36, 'rain-mid', [15, 25], [0.24, 0.48], [12, 20], [8, 16], [8, 15])
-const rainFront = rainSet(34, 'rain-front', [10, 20], [0.3, 0.65], [14, 24], [10, 20], [10, 18])
+const rainCloudsFar = cloudSet(6, 'rain-clouds-far', [22, 30], [0.14, 0.3], [0.9, 1.3])
+const rainCloudsMid = cloudSet(5, 'rain-clouds-mid', [15, 25], [0.2, 0.4], [0.8, 1.15])
+const rainCloudsFront = cloudSet(4, 'rain-clouds-front', [10, 20], [0.24, 0.48], [0.72, 1.02])
+
+const rainFar = rainSet(38, 'rain-far', [22, 30], [0.16, 0.34], [10, 17])
+const rainMid = rainSet(36, 'rain-mid', [15, 25], [0.24, 0.48], [12, 20])
+const rainFront = rainSet(34, 'rain-front', [10, 20], [0.3, 0.65], [14, 24])
 
 const snowFar = snowSet(34, 'snow-far', [22, 30], [0.24, 0.48], [1.8, 3.6], [8, 18])
 const snowMid = snowSet(32, 'snow-mid', [15, 25], [0.3, 0.62], [2.6, 4.6], [10, 24])
@@ -504,10 +524,13 @@ const lightningDarkStyle = computed(() => ({
   height: var(--length);
   border-radius: 999px;
   background: linear-gradient(to bottom, rgba(168, 217, 255, 0), rgba(122, 198, 255, var(--opacity)));
-  transform: rotate(var(--tilt));
   animation: rainFall var(--duration) linear infinite;
   animation-delay: var(--delay);
   will-change: transform, opacity;
+}
+
+.storm-cloud {
+  background: rgba(193, 213, 237, var(--opacity));
 }
 
 .rain-drop.layer-far {
@@ -659,14 +682,14 @@ const lightningDarkStyle = computed(() => ({
 
 @keyframes rainFall {
   0% {
-    transform: translate3d(0, -22vh, 0) rotate(var(--tilt));
+    transform: translate3d(0, -22vh, 0);
     opacity: 0;
   }
   10% {
     opacity: var(--opacity);
   }
   100% {
-    transform: translate3d(var(--drift), 122vh, 0) rotate(var(--tilt));
+    transform: translate3d(0, 122vh, 0);
     opacity: 0;
   }
 }
