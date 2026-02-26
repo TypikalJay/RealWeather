@@ -1,16 +1,6 @@
 ﻿<template>
   <div class="app">
-    <div class="sky-bg">
-      <span class="haze haze-1"></span>
-      <span class="haze haze-2"></span>
-      <span class="haze haze-3"></span>
-      <span
-        class="bg-cloud"
-        v-for="n in 9"
-        :key="'bg-cloud-' + n"
-        :style="{ '--i': n }"
-      ></span>
-    </div>
+    <WeatherBackground :condition="currentCondition" :icon="currentIcon" />
 
     <div class="weather-shell">
       <header class="app-head">
@@ -49,10 +39,31 @@
           >
             deg F
           </button>
+          <button
+            type="button"
+            class="unit-btn theme-toggle-btn"
+            :class="{ active: isDarkMode }"
+            @click="toggleTheme"
+            :aria-label="isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'"
+            :title="isDarkMode ? 'Light mode' : 'Dark mode'"
+          >
+            {{ isDarkMode ? 'Dark' : 'Light' }}
+          </button>
+        </div>
+        <div class="recent-searches" v-if="searchHistory.length">
+          <button
+            v-for="city in searchHistory"
+            :key="'recent-' + city"
+            type="button"
+            class="recent-chip"
+            @click="searchFromHistory(city)"
+          >
+            {{ city }}
+          </button>
         </div>
       </section>
 
-      <section v-if="!weatherStore.currentWeather" class="empty-card">
+      <section v-if="!weatherStore.currentWeather && !weatherStore.error" class="empty-card">
         <div class="sky-icon">
           <div class="sun"></div>
           <div class="cloud c1"></div>
@@ -72,28 +83,38 @@
         </div>
       </section>
 
-      <section v-else class="main-grid">
+      <transition v-else name="weather-swap" mode="out-in">
+      <section class="main-grid" :key="'main-' + weatherUpdateKey">
         <article class="current-card">
-          <div class="card-title">Current Weather</div>
-          <div class="current-layout">
+          <div class="card-title">
+            Current Weather
+            <span v-if="weatherStore.loading" class="loading-indicator" aria-live="polite">
+              <span class="loading-spinner" aria-hidden="true"></span>
+              Loading...
+            </span>
+          </div>
+          <transition name="fade-error">
+            <div v-if="weatherStore.error" class="error-banner" role="alert" aria-live="polite">
+              {{ weatherStore.error }}
+            </div>
+          </transition>
+          <div v-if="!weatherStore.error" class="current-layout">
             <div class="sky-icon">
-              <div class="sun"></div>
-              <div class="cloud c1"></div>
-              <div class="cloud c2"></div>
-              <div class="rain" v-if="showRain(weatherStore.currentWeather.weather[0].main)">
-                <span
-                  class="drop"
-                  v-for="n in 10"
-                  :key="'hero-drop-' + n"
-                  :style="{ '--i': n }"
-                ></span>
-              </div>
+              <div
+                class="icon main-weather-icon"
+                :class="mainWeatherIconClass"
+                v-html="iconSvg(weatherIcon)"
+              ></div>
             </div>
             <div class="current-meta">
               <h2>{{ weatherStore.currentWeather.name }}</h2>
               <p class="desc">{{ capitalize(weatherStore.currentWeather.weather[0].description) }}</p>
               <p class="temp-big">
-                {{ toDisplayTemp(weatherStore.currentWeather.main.temp) }}&deg;{{ unitSymbol }}
+                <transition name="temp-change" mode="out-in">
+                  <span :key="tempDisplayKey" class="temp-value">
+                    {{ toDisplayTemp(weatherStore.currentWeather.main.temp) }}&deg;{{ unitSymbol }}
+                  </span>
+                </transition>
               </p>
               <p class="meta-line">
                 Humidity: {{ weatherStore.currentWeather.main.humidity }}% |
@@ -106,7 +127,7 @@
             </div>
           </div>
 
-          <div class="highlights">
+          <div v-if="!weatherStore.error" class="highlights">
             <div class="highlight">
               <span>Rain chance</span>
               <strong>{{ rainChance(weatherStore.currentWeather) }}%</strong>
@@ -120,10 +141,33 @@
               <strong>{{ toDisplayTemp(weatherStore.currentWeather.main.feels_like) }}&deg;{{ unitSymbol }}</strong>
             </div>
           </div>
+
+          <section class="hourly-forecast" v-if="hourlyForecast.length && !weatherStore.error">
+            <div class="hourly-title">Next 12 Hours</div>
+            <transition name="fade-update" mode="out-in">
+              <div class="hourly-scroll" :key="hourlyForecastKey">
+                <article
+                  class="hourly-card"
+                  v-for="(slot, index) in hourlyForecast"
+                  :key="'hour-' + index + '-' + slot.dt"
+                >
+                  <p class="hourly-time">{{ formatHour(slot.dt_txt) }}</p>
+                  <div class="icon" v-html="iconSvg(slot.weather[0].main)"></div>
+                  <p class="hourly-temp">{{ toDisplayTemp(slot.main.temp) }}&deg;{{ unitSymbol }}</p>
+                </article>
+              </div>
+            </transition>
+          </section>
         </article>
 
-        <aside class="side-forecast" v-if="dailyForecast.length">
-          <div class="card-title">Daily Forecast</div>
+        <aside class="side-forecast" v-if="dailyForecast.length && !weatherStore.error">
+          <div class="card-title">
+            Daily Forecast
+            <span v-if="weatherStore.loading" class="loading-indicator" aria-live="polite">
+              <span class="loading-spinner" aria-hidden="true"></span>
+              Updating...
+            </span>
+          </div>
           <div
             class="side-row"
             v-for="(day, index) in dailyForecast"
@@ -138,8 +182,10 @@
           </div>
         </aside>
       </section>
+      </transition>
 
-      <section class="cards-forecast" v-if="dailyForecast.length">
+      <transition name="weather-swap" mode="out-in">
+      <section class="cards-forecast" v-if="dailyForecast.length && !weatherStore.error" :key="'cards-' + weatherUpdateKey">
         <h3>5-Day Forecast</h3>
         <div class="cards-grid">
           <article
@@ -156,19 +202,61 @@
           </article>
         </div>
       </section>
+      </transition>
     </div>
   </div>
 </template>
 
+
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useWeatherStore } from '@/stores/weather'
+import WeatherBackground from '@/components/WeatherBackground.vue'
 
 const cityInput = ref('')
 const weatherStore = useWeatherStore()
 const useCelsius = ref(true)
+const isDarkMode = ref(true)
+const searchHistory = ref([])
+
+const THEME_STORAGE_KEY = 'weather-theme-mode'
+const SEARCH_HISTORY_KEY = 'weather-search-history'
 
 const unitSymbol = computed(() => (useCelsius.value ? 'C' : 'F'))
+const hourlyForecast = computed(() => weatherStore.hourlyForecast)
+const hourlyForecastKey = computed(() => hourlyForecast.value.map((slot) => slot.dt).join('-'))
+const weatherUpdateKey = computed(() => `${weatherStore.currentWeather?.dt ?? 'none'}-${weatherStore.currentWeather?.name ?? 'none'}-${weatherStore.error ?? 'ok'}`)
+const tempDisplayKey = computed(() => `${weatherStore.currentWeather?.dt ?? 'none'}-${weatherStore.currentWeather?.main?.temp ?? 'none'}-${unitSymbol.value}`)
+const currentCondition = computed(() => weatherStore.currentWeather?.weather?.[0]?.main || '')
+const currentIcon = computed(() => weatherStore.currentWeather?.weather?.[0]?.icon || '')
+const weatherIcon = computed(() => {
+  const map = {
+    Clear: 'Clear',
+    Clouds: 'Clouds',
+    Rain: 'Rain',
+    Thunderstorm: 'Thunderstorm',
+    Snow: 'Snow',
+    Drizzle: 'Rain',
+    Mist: 'Fog',
+    Fog: 'Fog',
+    Haze: 'Fog'
+  }
+  return map[currentCondition.value] || 'Clear'
+})
+const mainWeatherIconClass = computed(() => {
+  const animationMap = {
+    Clear: 'is-clear',
+    Clouds: 'is-clouds',
+    Rain: 'is-rain',
+    Thunderstorm: 'is-thunderstorm',
+    Snow: 'is-snow',
+    Drizzle: 'is-drizzle',
+    Mist: 'is-fog',
+    Fog: 'is-fog',
+    Haze: 'is-fog'
+  }
+  return animationMap[currentCondition.value] || 'is-clear'
+})
 
 const dailyForecast = computed(() => {
   const groups = new Map()
@@ -179,12 +267,136 @@ const dailyForecast = computed(() => {
   return Array.from(groups.values()).slice(0, 5)
 })
 
-function getWeather() {
-  if (cityInput.value.trim()) {
-    weatherStore.fetchWeather(cityInput.value)
-    cityInput.value = ''
+function normalizeCity(city) {
+  return city.trim().replace(/\s+/g, ' ')
+}
+
+function loadSearchHistory() {
+  const raw = localStorage.getItem(SEARCH_HISTORY_KEY)
+  if (!raw) {
+    searchHistory.value = []
+    return
+  }
+  try {
+    const parsed = JSON.parse(raw)
+    if (Array.isArray(parsed)) {
+      searchHistory.value = parsed.slice(0, 3).filter((item) => typeof item === 'string' && item.trim())
+      return
+    }
+  } catch (error) {
+    console.error('Failed to parse search history:', error)
+  }
+  searchHistory.value = []
+}
+
+function saveSearchHistory() {
+  localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(searchHistory.value))
+}
+
+function addToSearchHistory(city) {
+  const normalized = normalizeCity(city)
+  if (!normalized) return
+
+  searchHistory.value = [
+    normalized,
+    ...searchHistory.value.filter((item) => item.toLowerCase() !== normalized.toLowerCase())
+  ].slice(0, 3)
+  saveSearchHistory()
+}
+
+let searchDebounceTimer = null
+
+function queueDebouncedSearch(city) {
+  const normalized = normalizeCity(city)
+  if (!normalized) return
+
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer)
+  }
+
+  searchDebounceTimer = setTimeout(() => {
+    runCitySearch(normalized)
+  }, 500)
+}
+
+function clearDebouncedSearch() {
+  if (!searchDebounceTimer) return
+  clearTimeout(searchDebounceTimer)
+  searchDebounceTimer = null
+}
+
+async function runCitySearch(city) {
+  const normalized = normalizeCity(city)
+  if (!normalized) return
+
+  await weatherStore.fetchWeather(normalized)
+  if (!weatherStore.error) {
+    addToSearchHistory(normalized)
   }
 }
+
+async function getWeather() {
+  if (!cityInput.value.trim()) return
+  const city = cityInput.value
+  cityInput.value = ''
+  queueDebouncedSearch(city)
+}
+
+async function searchFromHistory(city) {
+  clearDebouncedSearch()
+  await runCitySearch(city)
+}
+
+async function requestInitialWeather() {
+  if (!navigator.geolocation) {
+    weatherStore.fetchWeather('London')
+    return
+  }
+
+  const position = await new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject)
+  }).catch(() => null)
+
+  if (position?.coords) {
+    await weatherStore.fetchWeatherByCoords(position.coords.latitude, position.coords.longitude)
+    if (!weatherStore.currentWeather) {
+      weatherStore.fetchWeather('London')
+    }
+    return
+  }
+
+  weatherStore.fetchWeather('London')
+}
+
+function applyTheme(isDark) {
+  document.documentElement.classList.toggle('dark', isDark)
+}
+
+function toggleTheme() {
+  isDarkMode.value = !isDarkMode.value
+  applyTheme(isDarkMode.value)
+  localStorage.setItem(THEME_STORAGE_KEY, isDarkMode.value ? 'dark' : 'light')
+}
+
+function initTheme() {
+  const savedTheme = localStorage.getItem(THEME_STORAGE_KEY)
+  if (savedTheme === 'dark' || savedTheme === 'light') {
+    isDarkMode.value = savedTheme === 'dark'
+  } else {
+    isDarkMode.value = window.matchMedia('(prefers-color-scheme: dark)').matches
+  }
+  applyTheme(isDarkMode.value)
+}
+
+onMounted(() => {
+  initTheme()
+  loadSearchHistory()
+  requestInitialWeather()
+})
+
+onBeforeUnmount(() => {
+  clearDebouncedSearch()
+})
 
 function toDate(value) {
   return new Date(value.replace(' ', 'T'))
@@ -196,6 +408,13 @@ function formatDay(value) {
 
 function formatDate(value) {
   return toDate(value).toLocaleDateString([], { month: 'short', day: 'numeric' })
+}
+
+function formatHour(value) {
+  return toDate(value)
+    .toLocaleTimeString([], { hour: 'numeric', hour12: true })
+    .replace(/\s/g, '')
+    .toUpperCase()
 }
 
 function capitalize(value) {
@@ -319,13 +538,13 @@ function iconSvg(main) {
 }
 
 .app {
-  --text: #f5fbff;
-  --muted: rgba(238, 246, 255, 0.88);
-  --glass: rgba(5, 18, 44, 0.78);
-  --glass-2: rgba(10, 28, 57, 0.82);
-  --line: rgba(255, 255, 255, 0.22);
+  --text: #162840;
+  --muted: rgba(38, 62, 92, 0.88);
+  --glass: rgba(242, 248, 255, 0.84);
+  --glass-2: rgba(229, 240, 254, 0.9);
+  --line: rgba(10, 38, 75, 0.16);
   --accent: #27c063;
-  --btn: #23314f;
+  --btn: #d6e7ff;
   min-height: 100vh;
   position: relative;
   overflow: hidden;
@@ -340,10 +559,88 @@ function iconSvg(main) {
   position: absolute;
   inset: 0;
   background:
+    radial-gradient(circle at 15% 18%, rgba(255, 195, 133, 0.45), transparent 36%),
+    radial-gradient(circle at 64% 20%, rgba(255, 183, 128, 0.34), transparent 34%),
+    linear-gradient(160deg, #8dc9f6 0%, #79c1f5 32%, #88cbf8 58%, #7fb7ec 100%);
+  z-index: 0;
+}
+
+.weather-overlays {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.rain-overlay,
+.snow-overlay,
+.stars-overlay,
+.lightning-overlay {
+  position: absolute;
+  inset: 0;
+}
+
+.rain-streak {
+  position: absolute;
+  width: 2px;
+  height: 18px;
+  left: calc(var(--i) * 2.35%);
+  top: -24px;
+  border-radius: 999px;
+  background: linear-gradient(to bottom, rgba(174, 227, 255, 0), rgba(121, 202, 255, 0.75));
+  animation: weatherRain 1.15s linear infinite;
+  animation-delay: calc(var(--i) * -0.11s);
+  opacity: 0.58;
+}
+
+.snow-flake {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  left: calc(var(--i) * 2.95%);
+  top: -10px;
+  border-radius: 50%;
+  background: rgba(234, 246, 255, 0.88);
+  animation: weatherSnow 7.8s linear infinite;
+  animation-delay: calc(var(--i) * -0.28s);
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.45));
+  opacity: 0.82;
+}
+
+.star {
+  position: absolute;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, var(--opacity));
+  animation: weatherTwinkle var(--duration) ease-in-out infinite;
+  animation-delay: var(--delay);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.35);
+}
+
+.lightning-overlay {
+  background: radial-gradient(circle at 65% 12%, rgba(255, 255, 255, 0.82), transparent 35%);
+  mix-blend-mode: screen;
+  animation: weatherLightning 6.2s linear infinite;
+  opacity: 0;
+}
+
+:global(html.dark) .app {
+  --text: #f5fbff;
+  --muted: rgba(238, 246, 255, 0.88);
+  --glass: rgba(5, 18, 44, 0.78);
+  --glass-2: rgba(10, 28, 57, 0.82);
+  --line: rgba(255, 255, 255, 0.22);
+  --accent: #27c063;
+  --btn: #23314f;
+}
+
+:global(html.dark) .sky-bg {
+  background:
     radial-gradient(circle at 15% 18%, rgba(255, 195, 133, 0.55), transparent 36%),
     radial-gradient(circle at 64% 20%, rgba(255, 183, 128, 0.48), transparent 34%),
     linear-gradient(160deg, #1f7fca 0%, #1390da 32%, #1d95db 58%, #0d65ae 100%);
-  z-index: 0;
 }
 
 .haze {
@@ -418,7 +715,7 @@ function iconSvg(main) {
   position: relative;
   z-index: 1;
   width: min(1160px, 100%);
-  padding: 20px;
+  padding: 24px;
   border-radius: 26px;
   background: rgba(6, 16, 34, 0.62);
   border: 1px solid var(--line);
@@ -469,18 +766,36 @@ function iconSvg(main) {
   margin-bottom: 18px;
 }
 
+.recent-searches {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.recent-chip {
+  border: 1px solid var(--line);
+  background: var(--glass-2);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .search {
   padding: 14px 16px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid var(--line);
   background: var(--glass-2);
-  color: #fff;
+  color: var(--text);
   font-size: 1rem;
   outline: none;
 }
 
 .search::placeholder {
-  color: rgba(255, 255, 255, 0.82);
+  color: var(--muted);
 }
 
 .search-btn {
@@ -506,7 +821,7 @@ function iconSvg(main) {
   border: none;
   background: transparent;
   border-radius: 999px;
-  color: #eef6ff;
+  color: var(--text);
   padding: 8px 12px;
   cursor: pointer;
   font-weight: 700;
@@ -540,7 +855,7 @@ function iconSvg(main) {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
   gap: 16px;
-  margin-bottom: 18px;
+  margin-bottom: 20px;
 }
 
 .current-card,
@@ -549,13 +864,52 @@ function iconSvg(main) {
   background: var(--glass);
   border: 1px solid var(--line);
   border-radius: 22px;
-  padding: 18px;
+  padding: 20px;
 }
 
 .card-title {
-  font-size: 1.1rem;
+  font-size: 1.05rem;
+  letter-spacing: 0.01em;
   font-weight: 700;
   margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.loading-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+  animation: softFade 1.2s ease-in-out infinite;
+}
+
+.loading-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: var(--accent);
+  animation: spin 0.75s linear infinite;
+}
+
+.error-banner {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 107, 107, 0.35);
+  background: rgba(255, 107, 107, 0.14);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+:global(html:not(.dark)) .loading-spinner {
+  border-color: rgba(10, 38, 75, 0.2);
+  border-top-color: var(--accent);
 }
 
 .current-layout {
@@ -566,23 +920,28 @@ function iconSvg(main) {
 
 .current-meta h2 {
   margin: 0 0 4px;
-  font-size: 2rem;
+  font-size: clamp(1.7rem, 2.4vw, 2.2rem);
+  line-height: 1.1;
 }
 
 .desc {
-  margin: 0;
+  margin: 0 0 2px;
   color: var(--muted);
+  font-size: 0.98rem;
+  font-weight: 500;
 }
 
 .temp-big {
-  margin: 8px 0;
-  font-size: 3.2rem;
+  margin: 10px 0 8px;
+  font-size: clamp(2.6rem, 6vw, 4.1rem);
+  line-height: 0.95;
   font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 .meta-line {
   margin: 4px 0;
-  color: #eaf3ff;
+  color: var(--text);
 }
 
 .highlights {
@@ -590,6 +949,63 @@ function iconSvg(main) {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
+}
+
+.hourly-forecast {
+  margin-top: 14px;
+}
+
+.hourly-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.hourly-scroll {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding-bottom: 2px;
+}
+
+.hourly-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.hourly-card {
+  flex: 0 0 auto;
+  min-width: 100px;
+  scroll-snap-align: start;
+  background: rgba(17, 44, 84, 0.5);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px;
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 4px;
+}
+
+.hourly-time,
+.hourly-temp {
+  margin: 0;
+}
+
+.hourly-time {
+  font-size: 0.84rem;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.hourly-temp {
+  font-size: 1rem;
+  font-weight: 700;
 }
 
 .highlight {
@@ -634,7 +1050,7 @@ function iconSvg(main) {
 
 .side-desc,
 .side-temp {
-  color: #edf4ff;
+  color: var(--text);
   font-size: 0.82rem;
 }
 
@@ -658,11 +1074,12 @@ function iconSvg(main) {
   justify-items: center;
   text-align: center;
   gap: 5px;
-  transition: transform 0.2s ease;
+  transition: transform 0.24s ease, box-shadow 0.24s ease;
 }
 
 .day-card:hover {
-  transform: translateY(-3px);
+  transform: translateY(-4px);
+  box-shadow: 0 10px 24px rgba(8, 22, 44, 0.22);
 }
 
 .day-name {
@@ -675,7 +1092,7 @@ function iconSvg(main) {
 .card-desc,
 .card-rain {
   margin: 0;
-  color: #edf4ff;
+  color: var(--text);
   font-size: 0.9rem;
 }
 
@@ -685,9 +1102,47 @@ function iconSvg(main) {
   font-weight: 800;
 }
 
+.temp-value {
+  display: inline-block;
+}
+
 .icon svg {
   width: 34px;
   height: 34px;
+}
+
+.main-weather-icon svg {
+  width: 180px;
+  height: 135px;
+  will-change: transform, opacity, filter;
+}
+
+.main-weather-icon.is-clear svg {
+  animation: iconClearRotate 16s linear infinite;
+}
+
+.main-weather-icon.is-clouds svg {
+  animation: iconCloudFloat 4.6s ease-in-out infinite;
+}
+
+.main-weather-icon.is-rain svg {
+  animation: iconRainDrop 1.35s ease-in-out infinite;
+}
+
+.main-weather-icon.is-thunderstorm svg {
+  animation: iconStormPulse 4.8s ease-in-out infinite;
+}
+
+.main-weather-icon.is-snow svg {
+  animation: iconSnowFall 4.4s ease-in-out infinite;
+}
+
+.main-weather-icon.is-drizzle svg {
+  animation: iconDrizzleFloat 3.8s ease-in-out infinite;
+}
+
+.main-weather-icon.is-fog svg {
+  animation: iconFogFade 3.2s ease-in-out infinite;
 }
 
 .sky-icon {
@@ -809,6 +1264,203 @@ function iconSvg(main) {
   }
 }
 
+@keyframes weatherRain {
+  0% {
+    transform: translate3d(0, -20px, 0) rotate(12deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translate3d(14px, calc(100vh + 20px), 0) rotate(12deg);
+    opacity: 0;
+  }
+}
+
+@keyframes weatherSnow {
+  0% {
+    transform: translate3d(0, -14px, 0);
+  }
+  50% {
+    transform: translate3d(12px, 48vh, 0);
+  }
+  100% {
+    transform: translate3d(-8px, 105vh, 0);
+  }
+}
+
+@keyframes weatherTwinkle {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes weatherLightning {
+  0%,
+  92%,
+  100% {
+    opacity: 0;
+  }
+  93% {
+    opacity: 0.34;
+  }
+  94% {
+    opacity: 0.06;
+  }
+  95% {
+    opacity: 0.42;
+  }
+  96% {
+    opacity: 0;
+  }
+}
+
+@keyframes iconClearRotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes iconCloudFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes iconRainDrop {
+  0%,
+  100% {
+    transform: translateY(0);
+    filter: drop-shadow(0 0 0 rgba(79, 195, 247, 0));
+  }
+  50% {
+    transform: translateY(5px);
+    filter: drop-shadow(0 8px 4px rgba(79, 195, 247, 0.2));
+  }
+}
+
+@keyframes iconStormPulse {
+  0%,
+  84%,
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  86% {
+    transform: scale(1.03);
+    filter: brightness(1.5);
+  }
+  88% {
+    transform: scale(1);
+    filter: brightness(1.1);
+  }
+  90% {
+    transform: scale(1.04);
+    filter: brightness(1.6);
+  }
+}
+
+@keyframes iconSnowFall {
+  0% {
+    transform: translateY(-3px);
+  }
+  50% {
+    transform: translateY(4px);
+  }
+  100% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes iconDrizzleFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(3px);
+  }
+}
+
+@keyframes iconFogFade {
+  0%,
+  100% {
+    opacity: 0.95;
+  }
+  50% {
+    opacity: 0.68;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes softFade {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.fade-update-enter-active,
+.fade-update-leave-active {
+  transition: opacity 0.28s ease;
+}
+
+.fade-update-enter-from,
+.fade-update-leave-to {
+  opacity: 0;
+}
+
+.fade-error-enter-active,
+.fade-error-leave-active {
+  transition: opacity 0.28s ease;
+}
+
+.fade-error-enter-from,
+.fade-error-leave-to {
+  opacity: 0;
+}
+
+.weather-swap-enter-active,
+.weather-swap-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.weather-swap-enter-from,
+.weather-swap-leave-to {
+  opacity: 0;
+}
+
+.temp-change-enter-active,
+.temp-change-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.temp-change-enter-from,
+.temp-change-leave-to {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
 @media (max-width: 1080px) {
   .main-grid {
     grid-template-columns: 1fr;
@@ -822,6 +1474,10 @@ function iconSvg(main) {
 @media (max-width: 760px) {
   .app {
     padding: 14px;
+  }
+
+  .weather-shell {
+    padding: 16px;
   }
 
   .controls {
@@ -841,17 +1497,34 @@ function iconSvg(main) {
   }
 
   .cards-grid {
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    gap: 10px;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .cards-grid::-webkit-scrollbar {
+    display: none;
+  }
+
+  .day-card {
+    flex: 0 0 auto;
+    min-width: min(220px, 70vw);
+    scroll-snap-align: start;
   }
 
   .cards-forecast h3 {
-    font-size: 1.6rem;
+    font-size: 1.5rem;
   }
 }
 
 @media (max-width: 520px) {
-  .cards-grid {
-    grid-template-columns: 1fr;
+  .day-card {
+    min-width: 78vw;
   }
 
   .side-row {
