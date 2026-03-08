@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { Line } from 'vue-chartjs'
 import {
   Chart as ChartJS,
@@ -22,6 +22,19 @@ const props = defineProps({
     type: String,
     default: 'C'
   }
+})
+
+const isDarkMode = ref(false)
+
+function checkTheme() {
+  isDarkMode.value = document.documentElement.classList.contains('dark')
+}
+
+onMounted(() => {
+  checkTheme()
+  const observer = new MutationObserver(checkTheme)
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+  onUnmounted(() => observer.disconnect())
 })
 
 function formatHour(value) {
@@ -50,8 +63,8 @@ const temperatureChartData = computed(() => ({
     {
       label: `Temperature (deg ${props.unitSymbol})`,
       data: temperatureValues.value,
-      borderColor: '#22c55e',
-      backgroundColor: 'rgba(34, 197, 94, 0.15)',
+      borderColor: isDarkMode.value ? '#22c55e' : '#0ea5e9',
+      backgroundColor: isDarkMode.value ? 'rgba(34, 197, 94, 0.15)' : 'rgba(14, 165, 233, 0.15)',
       tension: 0.35,
       pointRadius: 2,
       borderWidth: 2
@@ -65,8 +78,8 @@ const rainChartData = computed(() => ({
     {
       label: 'Rain/Snow (mm)',
       data: rainValues.value,
-      borderColor: '#38bdf8',
-      backgroundColor: 'rgba(56, 189, 248, 0.16)',
+      borderColor: isDarkMode.value ? '#38bdf8' : '#0284c7',
+      backgroundColor: isDarkMode.value ? 'rgba(56, 189, 248, 0.16)' : 'rgba(2, 132, 199, 0.16)',
       tension: 0.3,
       pointRadius: 2,
       borderWidth: 2
@@ -74,27 +87,27 @@ const rainChartData = computed(() => ({
   ]
 }))
 
-const CHART_OPTIONS = Object.freeze({
+const CHART_OPTIONS = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
   plugins: {
     legend: {
       labels: {
-        color: '#dbeafe'
+        color: isDarkMode.value ? '#dbeafe' : '#1f2937'
       }
     }
   },
   scales: {
     x: {
-      ticks: { color: '#bfdbfe' },
-      grid: { color: 'rgba(191, 219, 254, 0.14)' }
+      ticks: { color: isDarkMode.value ? '#bfdbfe' : '#4b5563' },
+      grid: { color: isDarkMode.value ? 'rgba(191, 219, 254, 0.14)' : 'rgba(75, 85, 99, 0.14)' }
     },
     y: {
-      ticks: { color: '#bfdbfe' },
-      grid: { color: 'rgba(191, 219, 254, 0.14)' }
+      ticks: { color: isDarkMode.value ? '#bfdbfe' : '#4b5563' },
+      grid: { color: isDarkMode.value ? 'rgba(191, 219, 254, 0.14)' : 'rgba(75, 85, 99, 0.14)' }
     }
   }
-})
+}))
 </script>
 
 <template>

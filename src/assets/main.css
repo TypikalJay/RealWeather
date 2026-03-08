@@ -1,1 +1,19 @@
 @import "tailwindcss";
+
+:root {
+  --bg-main: #ffffff;
+  --card-bg: #f5f7fb;
+  --text-main: #0f172a;
+  --glass: rgba(255, 255, 255, 0.05);
+  --line: rgba(255, 255, 255, 0.1);
+  --muted: rgba(255, 255, 255, 0.6);
+}
+
+.dark {
+  --bg-main: #0f172a;
+  --card-bg: #1e293b;
+  --text-main: #f8fafc;
+  --glass: rgba(255, 255, 255, 0.05);
+  --line: rgba(255, 255, 255, 0.1);
+  --muted: rgba(255, 255, 255, 0.6);
+}

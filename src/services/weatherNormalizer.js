@@ -169,8 +169,8 @@ export function normalizeWeather(rawCurrent = {}, rawForecast = {}) {
   return {
     current,
     forecast: allForecastSlots,
-    hourlyNext12: allForecastSlots.slice(0, 4),
-    hourlyNext24: allForecastSlots.slice(0, 8),
+    hourlyNext12: allForecastSlots.slice(0, 12),
+    hourlyNext24: allForecastSlots.slice(0, 24),
     dailySummaries
   }
 }

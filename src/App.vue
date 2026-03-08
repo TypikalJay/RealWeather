@@ -8,14 +8,12 @@
           <div class="brand">
             <div>
               <h1
-                class="text-2xl sm:text-3xl font-semibold tracking-tight"
-                :class="isDarkMode ? 'text-white' : 'text-slate-800'"
+                class="text-2xl sm:text-3xl font-semibold tracking-tight text-slate-900 dark:text-white"
               >
-                Weather Dashboard
+                LumiCast
               </h1>
               <p
-                class="text-sm"
-                :class="isDarkMode ? 'text-white/70' : 'text-slate-600'"
+                class="text-sm text-slate-600 dark:text-slate-300"
               >
                 Live conditions and forecast
               </p>
@@ -36,18 +34,9 @@
             <button
               type="button"
               class="unit-btn"
-              :class="{ active: useCelsius }"
-              @click="useCelsius = true"
+              @click="toggleUnit"
             >
-              deg C
-            </button>
-            <button
-              type="button"
-              class="unit-btn"
-              :class="{ active: !useCelsius }"
-              @click="useCelsius = false"
-            >
-              deg F
+              {{ useCelsius ? '°C' : '°F' }}
             </button>
             <button
               type="button"
@@ -75,10 +64,32 @@
             :source="weatherSource"
             :timestamp="weatherSourceTime"
           />
+          <div
+            v-if="weatherStore.loading || weatherStore.error || searchSuccessMessage"
+            class="search-feedback"
+          >
+            <div v-if="weatherStore.loading" class="loading-indicator">
+              <span class="loading-spinner"></span>
+              <span>Searching weather...</span>
+            </div>
+            <div v-else-if="weatherStore.error" class="error-banner">
+              {{ weatherStore.error }}
+            </div>
+            <div v-else class="success-banner">
+              {{ searchSuccessMessage }}
+            </div>
+          </div>
         </section>
       </section>
 
-      <section v-if="!weatherStore.currentWeather && !weatherStore.error" class="empty-card">
+      <section v-if="weatherStore.loading && !weatherStore.currentWeather" class="empty-card">
+        <div class="loading-indicator">
+          <span class="loading-spinner"></span>
+          <span>Loading weather data...</span>
+        </div>
+      </section>
+
+      <section v-if="!weatherStore.currentWeather && !weatherStore.error && !weatherStore.loading" class="empty-card">
         <div class="sky-icon">
           <div class="sun"></div>
           <div class="cloud c1"></div>
@@ -107,66 +118,153 @@
         </div>
       </section>
 
-      <BusinessImpact
-        v-if="weatherData && !weatherStore.error"
-        :weather="weatherData"
-      />
+      <!-- Main Dashboard Grid -->
+        <div class="dashboard-container">
+          <!-- Current Weather Panel -->
+          <div class="dashboard-card current-weather">
+            <CurrentWeatherCard
+              :loading="weatherStore.loading"
+              :error="weatherStore.error"
+              :current-weather="weatherStore.currentWeather"
+              :main-weather-icon-class="mainWeatherIconClass"
+              :weather-icon="weatherIcon"
+              :temp-display-key="tempDisplayKey"
+              :unit-symbol="unitSymbol"
+              :hourly-forecast="hourlyForecast"
+              :impact-score="weatherStore.impactScore"
+              :trend-indicators="weatherStore.trendIndicators"
+              :activity-recommendations="weatherStore.activityRecommendations"
+              :hourly-forecast-key="hourlyForecastKey"
+              :to-display-temp="toDisplayTemp"
+              :capitalize="capitalize"
+              :format-hour="formatHour"
+              :icon-svg="iconSvg"
+            />
+          </div>
 
-      <transition v-if="weatherStore.currentWeather || weatherStore.error" name="weather-swap" mode="out-in">
-      <section class="main-grid" :key="'main-' + weatherUpdateKey">
-        <CurrentWeatherCard
-          :loading="weatherStore.loading"
-          :error="weatherStore.error"
-          :current-weather="weatherStore.currentWeather"
-          :main-weather-icon-class="mainWeatherIconClass"
-          :weather-icon="weatherIcon"
-          :temp-display-key="tempDisplayKey"
-          :unit-symbol="unitSymbol"
-          :hourly-forecast="hourlyForecast"
-          :impact-score="weatherStore.impactScore"
-          :trend-indicators="weatherStore.trendIndicators"
-          :activity-recommendations="weatherStore.activityRecommendations"
-          :hourly-forecast-key="hourlyForecastKey"
-          :to-display-temp="toDisplayTemp"
-          :capitalize="capitalize"
-          :wind-display="windDisplay"
-          :visibility-km="visibilityKm"
-          :rain-chance="rainChance"
-          :format-hour="formatHour"
-          :icon-svg="iconSvg"
-        />
-      </section>
-      </transition>
+          <!-- Stability Ring Panel -->
+          <div class="dashboard-card stability-ring">
+            <WeatherImpactCard
+              :impact-score="weatherStore.impactScore"
+              :current-weather="weatherStore.currentWeather"
+              :trend-indicators="weatherStore.trendIndicators"
+              :unit-symbol="unitSymbol"
+            />
+          </div>
 
-      <ForecastPanel
-        :daily-forecast="dailyForecast"
-        :weather-update-key="weatherUpdateKey"
-        :error="weatherStore.error"
-        :format-day="formatDay"
-        :icon-svg="iconSvg"
-        :capitalize="capitalize"
-        :to-display-temp="toDisplayTemp"
-        :unit-symbol="unitSymbol"
-      />
+          <!-- Seven Day Forecast -->
+          <div class="dashboard-card seven-day-forecast card-span-12">
+            <SevenDayForecastCard
+              :daily-forecast="dailyForecast"
+              :format-day="formatDay"
+              :icon-svg="iconSvg"
+              :to-display-temp="toDisplayTemp"
+              :unit-symbol="unitSymbol"
+            />
+          </div>
 
-      <WeatherTrendCharts
-        v-if="hourlyTrend.length && !weatherStore.error"
-        :points="hourlyTrend"
-        :unit-symbol="unitSymbol"
-      />
+          <div class="dashboard-card panel-next-12">
+            <Next12HoursCard
+              :hourly-forecast="hourlyForecast"
+              :format-hour="formatHour"
+              :icon-svg="iconSvg"
+              :to-display-temp="toDisplayTemp"
+              :unit-symbol="unitSymbol"
+            />
+          </div>
 
-      <InsightsPanel
-        :insights="weatherInsights"
-        :error="weatherStore.error"
-      />
+          <div class="dashboard-card panel-weather-trends">
+            <WeatherTrendsCard
+              :current-weather="weatherStore.currentWeather"
+              :trend-indicators="weatherStore.trendIndicators"
+              :unit-symbol="unitSymbol"
+            />
+          </div>
 
-      <WeatherIntelligencePanel
-        v-if="weatherStore.currentWeather && !weatherStore.error"
-        :profile="weatherStore.productivityProfile"
-        :strategic-angle="weatherStore.strategicAngle"
-        :recommendations="weatherStore.businessRecommendations"
-        :error="weatherStore.error"
-      />
+          <div class="dashboard-card panel-weather-insights">
+            <WeatherInsightsCard
+              :insights="weatherInsights"
+              :current-weather="weatherStore.currentWeather"
+            />
+          </div>
+
+          <div class="dashboard-card panel-activity-recommendations">
+            <ActivityRecommendationsCard
+              :recommendations="weatherStore.activityRecommendations"
+              :current-weather="weatherStore.currentWeather"
+            />
+          </div>
+
+          <div class="dashboard-card panel-risk-alerts">
+            <WeatherRiskAlertsCard
+              :forecast-data="hourlyTrend"
+              :current-weather="weatherStore.currentWeather"
+            />
+          </div>
+
+          <div class="dashboard-card panel-timeline">
+            <WeatherTimelineCard
+              :forecast-data="hourlyTrend"
+              :current-weather="weatherStore.currentWeather"
+            />
+          </div>
+
+          <div class="dashboard-card panel-demand-forecast">
+            <DemandForecastCard
+              :impact-score="weatherStore.impactScore"
+              :current-weather="weatherStore.currentWeather"
+            />
+          </div>
+
+          <div class="dashboard-card panel-ai-insight">
+            <AIForecastInsightCard
+              :forecast-data="hourlyTrend"
+              :current-weather="weatherStore.currentWeather"
+            />
+          </div>
+
+          <div class="dashboard-card card-span-12 panel-weather-intelligence">
+            <WeatherIntelligencePanel
+              :profile="weatherStore.productivityProfile"
+              :strategic-angle="weatherStore.strategicAngle"
+              :recommendations="weatherStore.businessRecommendations"
+              :error="weatherStore.error"
+            />
+          </div>
+
+          <div class="dashboard-card card-span-12 panel-forecast-legacy">
+            <ForecastPanel
+              :daily-forecast="dailyForecast"
+              :weather-update-key="weatherUpdateKey"
+              :error="weatherStore.error"
+              :format-day="formatDay"
+              :icon-svg="iconSvg"
+              :capitalize="capitalize"
+              :to-display-temp="toDisplayTemp"
+              :unit-symbol="unitSymbol"
+            />
+          </div>
+
+          <div class="dashboard-card card-span-12 panel-insights-legacy">
+            <InsightsPanel
+              :insights="weatherInsights"
+              :error="weatherStore.error"
+            />
+          </div>
+
+          <div class="dashboard-card card-span-12 panel-business-impact">
+            <BusinessImpact
+              :weather="weatherData"
+            />
+          </div>
+
+          <div class="dashboard-card card-span-12 panel-trend-charts">
+            <WeatherTrendCharts
+              :points="hourlyTrend"
+              :unit-symbol="unitSymbol"
+            />
+          </div>
+        </div>
     </div>
 
     <PerformanceBriefModal
@@ -192,6 +290,19 @@ import WeatherSourceBadge from '@/components/WeatherSourceBadge.vue'
 import WeatherIntelligencePanel from '@/components/WeatherIntelligencePanel.vue'
 import PerformanceBriefModal from '@/components/PerformanceBriefModal.vue'
 import { getCurrentPosition } from '@/utils/geolocation'
+
+// New dashboard components
+import WeatherImpactCard from '@/components/WeatherImpactCard.vue'
+import ActivityRecommendationsCard from '@/components/ActivityRecommendationsCard.vue'
+import Next12HoursCard from '@/components/Next12HoursCard.vue'
+import SevenDayForecastCard from '@/components/SevenDayForecastCard.vue'
+import WeatherInsightsCard from '@/components/WeatherInsightsCard.vue'
+import WeatherTrendsCard from '@/components/WeatherTrendsCard.vue'
+import AIForecastInsightCard from '@/components/AIForecastInsightCard.vue'
+import WeatherRiskAlertsCard from '@/components/WeatherRiskAlertsCard.vue'
+import DemandForecastCard from '@/components/DemandForecastCard.vue'
+import WeatherTimelineCard from '@/components/WeatherTimelineCard.vue'
+
 const WeatherTrendCharts = defineAsyncComponent(() => import('@/components/WeatherTrendCharts.vue'))
 
 const cityInput = ref('')
@@ -199,6 +310,8 @@ const weatherStore = useWeatherStore()
 const useCelsius = ref(true)
 const isDarkMode = ref(true)
 const searchHistory = ref([])
+const lastSearchedCity = ref('')
+const hasSearchedCity = ref(false)
 const geolocationDenied = ref(false)
 const showPerformanceBrief = ref(false)
 
@@ -210,6 +323,7 @@ const unitSymbol = computed(() => (useCelsius.value ? 'C' : 'F'))
 const hourlyForecast = computed(() => weatherStore.hourlyForecast)
 const hourlyTrend = computed(() => weatherStore.hourlyTrend)
 const weatherInsights = computed(() => weatherStore.insights || [])
+const dailyForecast = computed(() => weatherStore.forecast?.slice(0, 7) || [])
 const weatherSource = computed(() => weatherStore.lastSource)
 const weatherSourceTime = computed(() => weatherStore.lastUpdatedAt)
 const hourlyForecastKey = computed(() => hourlyForecast.value.map((slot) => slot.dt).join('-'))
@@ -217,6 +331,14 @@ const weatherUpdateKey = computed(() => `${weatherStore.currentWeather?.dt ?? 'n
 const tempDisplayKey = computed(() => `${weatherStore.currentWeather?.dt ?? 'none'}-${weatherStore.currentWeather?.main?.temp ?? 'none'}-${unitSymbol.value}`)
 const currentCondition = computed(() => weatherStore.currentWeather?.weather?.[0]?.main || '')
 const currentIcon = computed(() => weatherStore.currentWeather?.weather?.[0]?.icon || '')
+const searchSuccessMessage = computed(() => {
+  if (!hasSearchedCity.value || weatherStore.loading || weatherStore.error || !weatherStore.currentWeather) {
+    return ''
+  }
+
+  const cityName = weatherStore.currentWeather?.name || lastSearchedCity.value
+  return cityName ? `Weather loaded for ${cityName}.` : ''
+})
 const weatherIcon = computed(() => {
   const map = {
     Clear: 'Clear',
@@ -291,10 +413,6 @@ function setFaviconFromWeather(condition) {
   favicon.setAttribute('href', href)
 }
 
-const dailyForecast = computed(() => {
-  return weatherStore.forecast.slice(0, 5)
-})
-
 function normalizeCity(city) {
   return city.trim().replace(/\s+/g, ' ')
 }
@@ -357,6 +475,8 @@ async function runCitySearch(city) {
   const normalized = normalizeCity(city)
   if (!normalized) return
 
+  hasSearchedCity.value = true
+  lastSearchedCity.value = normalized
   await weatherStore.fetchWeather(normalized)
   if (!weatherStore.error) {
     addToSearchHistory(normalized)
@@ -401,6 +521,10 @@ function toggleTheme() {
   isDarkMode.value = !isDarkMode.value
   applyTheme(isDarkMode.value)
   localStorage.setItem(THEME_STORAGE_KEY, isDarkMode.value ? 'dark' : 'light')
+}
+
+function toggleUnit() {
+  useCelsius.value = !useCelsius.value
 }
 
 function initTheme() {
@@ -788,9 +912,15 @@ html.dark .sky-bg {
   background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(10px);
   border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 18px;
+  padding: 20px;
+  border-radius: 16px;
   box-shadow: 0 12px 24px rgba(4, 13, 28, 0.18);
+}
+
+html:not(.dark) .hero-panel {
+  background: #fff;
+  border-color: rgba(0, 0, 0, 0.2);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
 }
 
 .brand {
@@ -833,6 +963,10 @@ html.dark .sky-bg {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.search-feedback {
+  grid-column: 1 / -1;
 }
 
 .recent-chip {
@@ -920,12 +1054,84 @@ html.dark .sky-bg {
   margin-bottom: 20px;
 }
 
+.dashboard-top-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 768px) {
+  .dashboard-top-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Main Dashboard Grid Layout */
+.dashboard-container {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 24px;
+  align-items: stretch;
+}
+
+.dashboard-card {
+  grid-column: span 6;
+}
+
+.card-span-12 {
+  grid-column: span 12;
+}
+
+/* Responsive Grid */
+@media (max-width: 768px) {
+  .dashboard-container {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .dashboard-card,
+  .card-span-12 {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Shared Card Styling */
+.dashboard-card {
+  border-radius: 20px;
+  backdrop-filter: blur(14px);
+  background: rgba(20,20,20,0.6);
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 20px;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Minimum Widths */
+.current-weather,
+.stability-ring {
+  min-width: 160px;
+}
+
+/* Light Mode */
+.light .dashboard-card {
+  background: rgba(255,255,255,0.7);
+  border: 1px solid rgba(0,0,0,0.08);
+}
+
+/* Forecast Row Scrolling */
+.forecast-row {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+}
+
 .current-card,
 .cards-forecast {
   background: var(--glass);
   border: 1px solid var(--line);
   border-radius: 22px;
-  padding: 20px;
+  padding: 24px;
 }
 
 .current-card {
@@ -977,9 +1183,103 @@ html.dark .sky-bg {
   font-size: 0.92rem;
 }
 
+.success-banner {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(45, 207, 115, 0.35);
+  background: rgba(45, 207, 115, 0.12);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+html:not(.dark) .search {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(0, 0, 0, 0.2);
+  color: #1f2937;
+}
+
+html:not(.dark) .search::placeholder {
+  color: #6b7280;
+}
+
+html:not(.dark) .unit-toggle {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(0, 0, 0, 0.2);
+}
+
+html:not(.dark) .unit-btn {
+  color: #1f2937;
+}
+
+html:not(.dark) .unit-btn.active {
+  background: #2dcf73;
+  color: #fff;
+}
+
+html:not(.dark) .weather-shell {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+}
+
+html:not(.dark) .hero-panel {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(12px);
+}
+
 html:not(.dark) .loading-spinner {
   border-color: rgba(10, 38, 75, 0.2);
   border-top-color: var(--accent);
+}
+
+html:not(.dark) .current-card,
+html:not(.dark) .cards-forecast {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+html:not(.dark) .forecast-card {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #1f2937;
+}
+
+html:not(.dark) .forecast-card:hover {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+html:not(.dark) .hourly-card {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+html:not(.dark) .highlight {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+html:not(.dark) .icon svg {
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+}
+
+html.dark .icon svg {
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+
+.main-weather-icon {
+  font-size: 3rem;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+html.dark .main-weather-icon {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.hourly-card .icon {
+  font-size: 1.5rem;
 }
 
 .current-layout {
@@ -1027,10 +1327,10 @@ html:not(.dark) .loading-spinner {
 }
 
 .highlights {
-  margin-top: 14px;
+  margin-top: 20px;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 
 .hourly-forecast {
@@ -1043,6 +1343,20 @@ html:not(.dark) .loading-spinner {
   font-weight: 700;
   color: var(--muted);
   margin-bottom: 8px;
+}
+
+.hourly-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  padding: 4px 0;
+}
+
+@media (min-width: 768px) {
+  .hourly-grid {
+    grid-template-columns: repeat(6, 1fr);
+    gap: 16px;
+  }
 }
 
 .hourly-scroll {
@@ -1062,17 +1376,21 @@ html:not(.dark) .loading-spinner {
 }
 
 .hourly-card {
-  flex: 0 0 auto;
-  min-width: 100px;
-  scroll-snap-align: start;
   background: rgba(17, 44, 84, 0.5);
   border: 1px solid var(--line);
   border-radius: 14px;
-  padding: 10px;
+  padding: 12px;
   display: grid;
   justify-items: center;
   text-align: center;
-  gap: 4px;
+  gap: 6px;
+  min-height: 100px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hourly-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .hourly-time,
@@ -1094,9 +1412,10 @@ html:not(.dark) .loading-spinner {
 .highlight {
   background: rgba(17, 44, 84, 0.5);
   border-radius: 14px;
-  padding: 10px;
+  padding: 16px;
   display: grid;
-  gap: 4px;
+  gap: 6px;
+  text-align: center;
 }
 
 .mobile-low-priority {
@@ -1116,6 +1435,45 @@ html:not(.dark) .loading-spinner {
   margin: 0 0 12px;
   font-size: 2rem;
   text-align: center;
+}
+
+.forecast-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 20px;
+}
+
+@media (min-width: 768px) {
+  .forecast-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .forecast-grid {
+    grid-template-columns: repeat(7, 1fr);
+    gap: 24px;
+  }
+}
+
+.forecast-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 16px 8px;
+  background: rgba(17, 44, 84, 0.3);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.forecast-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .forecast-list {

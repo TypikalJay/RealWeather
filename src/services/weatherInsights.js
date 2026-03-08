@@ -20,7 +20,16 @@ export function generateWeatherInsights(normalizedWeather) {
   const humidity = Number(current.main?.humidity ?? 0)
   const windSpeed = Number(current.wind?.speed ?? 0)
   const currentRain = Number(current.rain?.['1h'] ?? 0)
+  const precipitation = Number(current.rain?.chance ?? 0)
   const condition = String(current.weather?.[0]?.main || '')
+
+  // Rain-based insights
+  if (precipitation > 2) {
+    insights.push({
+      type: "weather-alert",
+      message: "Rain expected. Outdoor activity and customer flow may decrease."
+    })
+  }
 
   const next3h = hourly[0]
   const next24h = hourly.slice(0, 8)

@@ -22,44 +22,64 @@ export function calculateImpactScore(normalizedWeather) {
   }
 
   const temp = toNumber(current.main?.temp)
-  const feelsLike = toNumber(current.main?.feels_like, temp)
   const humidity = toNumber(current.main?.humidity)
   const windSpeed = toNumber(current.wind?.speed)
-  const rainProb = toNumber(hourly[0]?.pop)
-  const condition = String(current.weather?.[0]?.main || '')
+  const rainChance = toNumber(current.rain?.chance || 0) * 100
+  const visibility = toNumber(current.main?.visibility) / 1000 // Convert to km
+  const condition = String(current.weather?.[0]?.main || '').toLowerCase()
 
+  // Start with perfect score
   let score = 100
 
-  // Temperature comfort penalty (18-26C ideal)
-  if (temp < 18) score -= clamp((18 - temp) * 3, 0, 30)
-  if (temp > 26) score -= clamp((temp - 26) * 3, 0, 30)
+  // Rain penalty
+  score -= rainChance * 0.4
 
-  // Humidity comfort penalty (40-60 ideal)
-  if (humidity < 40) score -= clamp((40 - humidity) * 0.7, 0, 14)
-  if (humidity > 60) score -= clamp((humidity - 60) * 0.7, 0, 20)
+  // Temperature comfort penalty (22°C ideal)
+  score -= Math.abs(temp - 22) * 1.5
 
-  // Wind severity
-  if (windSpeed > 12) score -= 24
-  else if (windSpeed > 8) score -= 14
-  else if (windSpeed > 5) score -= 7
+  // Wind penalty
+  if (windSpeed > 20) {
+    score -= 10
+  }
 
-  // Rain probability
-  score -= clamp(rainProb * 28, 0, 28)
+  // Visibility penalty
+  if (visibility < 5) {
+    score -= 15
+  }
 
-  // Extreme conditions
-  if (feelsLike > 35 || temp > 35) score -= 22
-  if (feelsLike < 0 || temp < 0) score -= 22
-  if (condition === 'Thunderstorm') score -= 30
+  // Storm condition penalty
+  if (condition.includes('storm') || condition.includes('thunder') || condition.includes('snow')) {
+    score -= 25
+  }
 
+  // Clamp result between 0 and 100
   score = Math.round(clamp(score, 0, 100))
 
+  // Generate label
   let label = 'Severe'
-  if (score >= 85) label = 'Excellent'
-  else if (score >= 70) label = 'Comfortable'
-  else if (score >= 50) label = 'Moderate'
-  else if (score >= 30) label = 'Poor'
+  if (score >= 80) label = 'Excellent'
+  else if (score >= 60) label = 'Good'
+  else if (score >= 40) label = 'Moderate'
+  else if (score >= 20) label = 'Poor'
+  else label = 'Severe'
 
-  return { score, label }
+  // Generate explanation
+  let explanation = ''
+  if (rainChance > 40) {
+    explanation = 'High rain probability may reduce outdoor activity.'
+  } else if (windSpeed > 20) {
+    explanation = 'Strong winds may affect outdoor plans.'
+  } else if (Math.abs(temp - 22) > 8) {
+    explanation = 'Temperature conditions may be uncomfortable.'
+  } else if (visibility < 5) {
+    explanation = 'Poor visibility may impact travel.'
+  } else if (condition.includes('storm') || condition.includes('thunder')) {
+    explanation = 'Storm conditions require safety precautions.'
+  } else {
+    explanation = 'Weather conditions are suitable for most activities.'
+  }
+
+  return { score, label, explanation }
 }
 
 export function generateActivityRecommendations(normalizedWeather, insights = []) {
