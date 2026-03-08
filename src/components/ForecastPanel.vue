@@ -55,3 +55,14 @@ defineProps({
     </section>
   </transition>
 </template>
+
+<style scoped>
+.forecast-card {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.forecast-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+}
+</style>

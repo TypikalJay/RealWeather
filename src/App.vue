@@ -147,7 +147,25 @@
             <WeatherImpactCard
               :impact-score="weatherStore.impactScore"
               :current-weather="weatherStore.currentWeather"
+              :hourly-forecast="hourlyForecast"
               :trend-indicators="weatherStore.trendIndicators"
+              :unit-symbol="unitSymbol"
+            />
+          </div>
+
+          <div class="dashboard-card panel-ai-forecast-intelligence">
+            <AIForecastIntelligence
+              :loading="weatherStore.loading"
+              :weather-data="sharedWeatherData"
+            />
+          </div>
+
+          <div class="dashboard-card panel-next-12">
+            <Next12HoursCard
+              :hourly-forecast="hourlyForecast"
+              :format-hour="formatHour"
+              :icon-svg="iconSvg"
+              :to-display-temp="toDisplayTemp"
               :unit-symbol="unitSymbol"
             />
           </div>
@@ -163,28 +181,11 @@
             />
           </div>
 
-          <div class="dashboard-card panel-next-12">
-            <Next12HoursCard
-              :hourly-forecast="hourlyForecast"
-              :format-hour="formatHour"
-              :icon-svg="iconSvg"
-              :to-display-temp="toDisplayTemp"
-              :unit-symbol="unitSymbol"
-            />
-          </div>
-
           <div class="dashboard-card panel-weather-trends">
             <WeatherTrendsCard
               :current-weather="weatherStore.currentWeather"
               :trend-indicators="weatherStore.trendIndicators"
               :unit-symbol="unitSymbol"
-            />
-          </div>
-
-          <div class="dashboard-card panel-weather-insights">
-            <WeatherInsightsCard
-              :insights="weatherInsights"
-              :current-weather="weatherStore.currentWeather"
             />
           </div>
 
@@ -216,22 +217,6 @@
             />
           </div>
 
-          <div class="dashboard-card panel-ai-insight">
-            <AIForecastInsightCard
-              :forecast-data="hourlyTrend"
-              :current-weather="weatherStore.currentWeather"
-            />
-          </div>
-
-          <div class="dashboard-card card-span-12 panel-weather-intelligence">
-            <WeatherIntelligencePanel
-              :profile="weatherStore.productivityProfile"
-              :strategic-angle="weatherStore.strategicAngle"
-              :recommendations="weatherStore.businessRecommendations"
-              :error="weatherStore.error"
-            />
-          </div>
-
           <div class="dashboard-card card-span-12 panel-forecast-legacy">
             <ForecastPanel
               :daily-forecast="dailyForecast"
@@ -245,19 +230,6 @@
             />
           </div>
 
-          <div class="dashboard-card card-span-12 panel-insights-legacy">
-            <InsightsPanel
-              :insights="weatherInsights"
-              :error="weatherStore.error"
-            />
-          </div>
-
-          <div class="dashboard-card card-span-12 panel-business-impact">
-            <BusinessImpact
-              :weather="weatherData"
-            />
-          </div>
-
           <div class="dashboard-card card-span-12 panel-trend-charts">
             <WeatherTrendCharts
               :points="hourlyTrend"
@@ -267,13 +239,6 @@
         </div>
     </div>
 
-    <PerformanceBriefModal
-      :open="showPerformanceBrief"
-      :profile="weatherStore.productivityProfile"
-      :recommendations="weatherStore.businessRecommendations"
-      @open-dashboard="closePerformanceBrief"
-      @dismiss="closePerformanceBrief"
-    />
   </div>
 </template>
 
@@ -282,23 +247,18 @@
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useWeatherStore } from '@/stores/weather'
 import WeatherBackground from '@/components/WeatherBackground.vue'
-import BusinessImpact from '@/components/BusinessImpact.vue'
 import CurrentWeatherCard from '@/components/CurrentWeatherCard.vue'
 import ForecastPanel from '@/components/ForecastPanel.vue'
-import InsightsPanel from '@/components/InsightsPanel.vue'
 import WeatherSourceBadge from '@/components/WeatherSourceBadge.vue'
-import WeatherIntelligencePanel from '@/components/WeatherIntelligencePanel.vue'
-import PerformanceBriefModal from '@/components/PerformanceBriefModal.vue'
 import { getCurrentPosition } from '@/utils/geolocation'
 
 // New dashboard components
 import WeatherImpactCard from '@/components/WeatherImpactCard.vue'
+import AIForecastIntelligence from '@/components/AIForecastIntelligence.vue'
 import ActivityRecommendationsCard from '@/components/ActivityRecommendationsCard.vue'
 import Next12HoursCard from '@/components/Next12HoursCard.vue'
 import SevenDayForecastCard from '@/components/SevenDayForecastCard.vue'
-import WeatherInsightsCard from '@/components/WeatherInsightsCard.vue'
 import WeatherTrendsCard from '@/components/WeatherTrendsCard.vue'
-import AIForecastInsightCard from '@/components/AIForecastInsightCard.vue'
 import WeatherRiskAlertsCard from '@/components/WeatherRiskAlertsCard.vue'
 import DemandForecastCard from '@/components/DemandForecastCard.vue'
 import WeatherTimelineCard from '@/components/WeatherTimelineCard.vue'
@@ -313,16 +273,13 @@ const searchHistory = ref([])
 const lastSearchedCity = ref('')
 const hasSearchedCity = ref(false)
 const geolocationDenied = ref(false)
-const showPerformanceBrief = ref(false)
 
 const THEME_STORAGE_KEY = 'weather-theme-mode'
 const SEARCH_HISTORY_KEY = 'weather-search-history'
-const PERFORMANCE_BRIEF_SESSION_KEY = 'weather-performance-brief-shown'
 
 const unitSymbol = computed(() => (useCelsius.value ? 'C' : 'F'))
 const hourlyForecast = computed(() => weatherStore.hourlyForecast)
 const hourlyTrend = computed(() => weatherStore.hourlyTrend)
-const weatherInsights = computed(() => weatherStore.insights || [])
 const dailyForecast = computed(() => weatherStore.forecast?.slice(0, 7) || [])
 const weatherSource = computed(() => weatherStore.lastSource)
 const weatherSourceTime = computed(() => weatherStore.lastUpdatedAt)
@@ -353,25 +310,15 @@ const weatherIcon = computed(() => {
   }
   return map[currentCondition.value] || 'Clear'
 })
-const weatherData = computed(() => {
-  const current = weatherStore.currentWeather
-  if (!current) return null
-
+const sharedWeatherData = computed(() => {
+  const current = weatherStore.currentWeather || null
+  const hourly = weatherStore.hourlyForecast || []
+  const impact = weatherStore.impactScore || { score: 0, label: 'Severe' }
   return {
-    temperature: Number(current.main?.temp ?? 0),
-    rainProbability: Math.round((weatherStore.hourlyForecast?.[0]?.pop ?? 0) * 100),
-    windSpeed: Number(current.wind?.speed ?? 0),
-    humidity: Number(current.main?.humidity ?? 0)
+    currentWeather: current,
+    hourlyForecast: hourly,
+    impactScore: impact
   }
-})
-const isPerformanceBriefReady = computed(() => {
-  return Boolean(
-    weatherStore.currentWeather &&
-    !weatherStore.loading &&
-    !weatherStore.error &&
-    weatherStore.productivityProfile?.label &&
-    weatherStore.businessRecommendations?.length
-  )
 })
 const mainWeatherIconClass = computed(() => {
   const animationMap = {
@@ -537,10 +484,6 @@ function initTheme() {
   applyTheme(isDarkMode.value)
 }
 
-function closePerformanceBrief() {
-  showPerformanceBrief.value = false
-}
-
 onMounted(() => {
   initTheme()
   loadSearchHistory()
@@ -553,23 +496,6 @@ watch(
     setFaviconFromWeather(condition)
   },
   { immediate: true }
-)
-
-watch(
-  () => isPerformanceBriefReady.value,
-  (ready) => {
-    if (!ready) return
-    if (sessionStorage.getItem(PERFORMANCE_BRIEF_SESSION_KEY) === '1') return
-    sessionStorage.setItem(PERFORMANCE_BRIEF_SESSION_KEY, '1')
-    showPerformanceBrief.value = true
-  }
-)
-
-watch(
-  () => showPerformanceBrief.value,
-  (open) => {
-    document.body.style.overflow = open ? 'hidden' : ''
-  }
 )
 
 onBeforeUnmount(() => {
@@ -1079,6 +1005,10 @@ html:not(.dark) .hero-panel {
   grid-column: span 6;
 }
 
+.panel-ai-forecast-intelligence {
+  grid-column: 7 / span 6;
+}
+
 .card-span-12 {
   grid-column: span 12;
 }
@@ -1092,6 +1022,10 @@ html:not(.dark) .hero-panel {
 
   .dashboard-card,
   .card-span-12 {
+    grid-column: 1 / -1;
+  }
+
+  .panel-ai-forecast-intelligence {
     grid-column: 1 / -1;
   }
 }

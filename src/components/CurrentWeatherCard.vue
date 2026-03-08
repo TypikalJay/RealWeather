@@ -91,6 +91,14 @@ const pressure = computed(() => {
   return pressure !== undefined && pressure !== null && pressure > 0 ? `${pressure} hPa` : 'N/A'
 })
 
+const weatherGlowClass = computed(() => {
+  const main = (props.currentWeather?.weather?.[0]?.main || '').toLowerCase()
+  if (main.includes('rain') || main.includes('drizzle')) return 'rain'
+  if (main.includes('clear')) return 'clear'
+  if (main.includes('thunderstorm') || main.includes('storm') || main.includes('squall') || main.includes('tornado')) return 'storm'
+  return ''
+})
+
 function trendArrow(value) {
   if (value === 'up') return '↑'
   if (value === 'down') return '↓'
@@ -99,7 +107,7 @@ function trendArrow(value) {
 </script>
 
 <template>
-  <div class="current-weather-card">
+  <div class="current-weather-card" :class="weatherGlowClass">
     <h3>Current Weather</h3>
     
     <div class="weather-content">
@@ -156,6 +164,19 @@ function trendArrow(value) {
   flex-direction: column;
   justify-content: space-between;
   height: 100%;
+  transition: box-shadow 0.3s ease;
+}
+
+.current-weather-card.rain {
+  box-shadow: 0 0 40px rgba(0, 150, 255, 0.25);
+}
+
+.current-weather-card.clear {
+  box-shadow: 0 0 40px rgba(255, 200, 80, 0.25);
+}
+
+.current-weather-card.storm {
+  box-shadow: 0 0 40px rgba(168, 85, 247, 0.22), 0 0 56px rgba(239, 68, 68, 0.18);
 }
 
 .current-weather-card h3 {

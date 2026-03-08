@@ -1,17 +1,11 @@
 import { defineStore } from 'pinia'
 import { fetchWeatherBundle } from '@/services/weatherApi'
 import { normalizeWeather } from '@/services/weatherNormalizer'
-import { generateWeatherInsights } from '@/services/weatherInsights'
 import {
   calculateImpactScore,
   computeTrendIndicators,
   generateActivityRecommendations
 } from '@/services/weatherProductMetrics'
-import {
-  buildBusinessRecommendations,
-  buildProductivityProfile,
-  buildStrategicAngle
-} from '@/services/weatherIntelligence'
 
 let activeRequestId = 0
 let activeController = null
@@ -22,7 +16,6 @@ export const useWeatherStore = defineStore('weather', {
     forecast: [],
     hourlyForecast: [],
     hourlyTrend: [],
-    insights: [],
     impactScore: {
       score: 0,
       label: 'Severe'
@@ -32,13 +25,6 @@ export const useWeatherStore = defineStore('weather', {
       temperature: 'flat',
       humidity: 'flat'
     },
-    productivityProfile: {
-      label: 'Strategic Day',
-      confidence: 0,
-      reasoning: ''
-    },
-    businessRecommendations: [],
-    strategicAngle: '',
     loading: false,
     error: null,
     lastSource: null,
@@ -75,24 +61,9 @@ export const useWeatherStore = defineStore('weather', {
           this.forecast = bundle.daily || normalized.dailySummaries
           this.hourlyForecast = normalized.hourlyNext12
           this.hourlyTrend = normalized.hourlyNext24
-          this.insights = generateWeatherInsights(normalized)
           this.impactScore = calculateImpactScore(normalized)
           this.trendIndicators = computeTrendIndicators(normalized)
-          this.activityRecommendations = generateActivityRecommendations(normalized, this.insights)
-          this.productivityProfile = buildProductivityProfile({
-            normalizedWeather: normalized,
-            impactScore: this.impactScore,
-            insights: this.insights
-          })
-          this.businessRecommendations = buildBusinessRecommendations({
-            normalizedWeather: normalized,
-            impactScore: this.impactScore,
-            insights: this.insights
-          })
-          this.strategicAngle = buildStrategicAngle({
-            profile: this.productivityProfile,
-            recommendations: this.businessRecommendations
-          })
+          this.activityRecommendations = generateActivityRecommendations(normalized)
           this.lastSource = bundle.source || 'network'
           this.lastUpdatedAt = bundle.servedAt ?? Date.now()
           this.loading = false

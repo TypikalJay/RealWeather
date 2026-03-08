@@ -6,7 +6,7 @@
       <div 
         v-for="(day, index) in dailyForecast.slice(0, 7)" 
         :key="index"
-        class="forecast-day"
+        class="forecast-day forecast-card"
       >
         <div class="day-name">{{ formatDay(day.dt_txt) }}</div>
         <div class="day-icon">
@@ -106,6 +106,15 @@ function getWeatherIcon(condition) {
   gap: 8px;
   min-width: 0;
   padding: 6px 4px;
+}
+
+.forecast-card {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.forecast-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
 }
 
 .day-name {
