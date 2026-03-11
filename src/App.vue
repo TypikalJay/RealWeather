@@ -153,6 +153,13 @@
             />
           </div>
 
+          <div class="dashboard-card panel-weather-copilot">
+            <WeatherCopilot
+              :loading="weatherStore.loading"
+              :weather-data="sharedWeatherData"
+            />
+          </div>
+
           <div class="dashboard-card panel-ai-forecast-intelligence">
             <AIForecastIntelligence
               :loading="weatherStore.loading"
@@ -164,6 +171,17 @@
             <Next12HoursCard
               :hourly-forecast="hourlyForecast"
               :format-hour="formatHour"
+              :icon-svg="iconSvg"
+              :to-display-temp="toDisplayTemp"
+              :unit-symbol="unitSymbol"
+            />
+          </div>
+
+          <div class="dashboard-card panel-hourly-decision-timeline">
+            <HourlyDecisionTimeline
+              :weather-data="sharedWeatherData"
+              :hourly-forecast="hourlyForecast"
+              :current-weather="weatherStore.currentWeather"
               :icon-svg="iconSvg"
               :to-display-temp="toDisplayTemp"
               :unit-symbol="unitSymbol"
@@ -254,9 +272,11 @@ import { getCurrentPosition } from '@/utils/geolocation'
 
 // New dashboard components
 import WeatherImpactCard from '@/components/WeatherImpactCard.vue'
+import WeatherCopilot from '@/components/WeatherCopilot.tsx'
 import AIForecastIntelligence from '@/components/AIForecastIntelligence.vue'
 import ActivityRecommendationsCard from '@/components/ActivityRecommendationsCard.vue'
 import Next12HoursCard from '@/components/Next12HoursCard.vue'
+import HourlyDecisionTimeline from '@/components/HourlyDecisionTimeline.tsx'
 import SevenDayForecastCard from '@/components/SevenDayForecastCard.vue'
 import WeatherTrendsCard from '@/components/WeatherTrendsCard.vue'
 import WeatherRiskAlertsCard from '@/components/WeatherRiskAlertsCard.vue'
@@ -1009,6 +1029,10 @@ html:not(.dark) .hero-panel {
   grid-column: 7 / span 6;
 }
 
+.panel-weather-copilot {
+  grid-column: 7 / span 6;
+}
+
 .card-span-12 {
   grid-column: span 12;
 }
@@ -1028,17 +1052,23 @@ html:not(.dark) .hero-panel {
   .panel-ai-forecast-intelligence {
     grid-column: 1 / -1;
   }
+
+  .panel-weather-copilot {
+    grid-column: 1 / -1;
+  }
 }
 
 /* Shared Card Styling */
 .dashboard-card {
-  border-radius: 20px;
+  border-radius: 16px;
   backdrop-filter: blur(14px);
-  background: rgba(20,20,20,0.6);
-  border: 1px solid rgba(255,255,255,0.08);
-  padding: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 24px;
   height: 100%;
   overflow: hidden;
+  box-shadow: 0 10px 28px rgba(5, 12, 30, 0.18);
+  transition: box-shadow 0.2s ease;
 }
 
 /* Minimum Widths */
@@ -1048,9 +1078,18 @@ html:not(.dark) .hero-panel {
 }
 
 /* Light Mode */
-.light .dashboard-card {
-  background: rgba(255,255,255,0.7);
-  border: 1px solid rgba(0,0,0,0.08);
+html:not(.dark) .app {
+  background: #f3f4f6;
+}
+
+html:not(.dark) .dashboard-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.12), 0 2px 4px -2px rgba(15, 23, 42, 0.12);
+}
+
+html:not(.dark) .dashboard-card:hover {
+  box-shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.16), 0 4px 6px -4px rgba(15, 23, 42, 0.14);
 }
 
 /* Forecast Row Scrolling */

@@ -1,5 +1,7 @@
 <script setup>
 import { computed } from 'vue'
+import { generateForecastInsights } from '@/utils/forecastIntelligence'
+import DailyWeatherSummary from '@/components/DailyWeatherSummary.tsx'
 
 const props = defineProps({
   loading: {
@@ -12,91 +14,28 @@ const props = defineProps({
   }
 })
 
-function toHourLabel(raw) {
-  if (!raw) return 'later'
-  const date = new Date(String(raw).replace(' ', 'T'))
-  if (Number.isNaN(date.getTime())) return 'later'
-  return date
-    .toLocaleTimeString([], { hour: 'numeric', hour12: true })
-    .replace(/\s/g, '')
-    .toLowerCase()
-}
-
-const parsed = computed(() => {
+const intelligence = computed(() => {
   const data = props.weatherData || {}
   const current = data.currentWeather || {}
   const hourly = Array.isArray(data.hourlyForecast) ? data.hourlyForecast : []
-  const impactScore = Number(data.impactScore?.score ?? 0)
-
-  const temperature = Number(current?.main?.temp ?? 0)
-  const humidity = Number(current?.main?.humidity ?? 0)
-  const windSpeed = Number(current?.wind?.speed ?? 0)
-  const uvIndex = Number(current?.uvi ?? current?.uvIndex ?? 0)
-  const condition = String(current?.weather?.[0]?.main || '').toLowerCase()
-  const rainChanceNow = Math.round(Number(hourly[0]?.pop ?? 0) * 100)
-
-  return {
-    hourly,
-    impactScore,
-    temperature,
-    humidity,
-    windSpeed,
-    uvIndex,
-    condition,
-    rainChanceNow
-  }
-})
-
-const insights = computed(() => {
-  const p = parsed.value
-  const output = []
-
-  const sweetSlots = p.hourly
-    .slice(0, 8)
-    .filter((slot) => {
-      const temp = Number(slot?.main?.temp ?? p.temperature)
-      const rain = Number(slot?.pop ?? 0) * 100
-      const wind = Number(slot?.wind?.speed ?? p.windSpeed)
-      return temp >= 18 && temp <= 25 && rain < 35 && wind <= 30
-    })
-
-  if (sweetSlots.length >= 2) {
-    output.push(
-      `Today is ideal for outdoor work between ${toHourLabel(sweetSlots[0]?.dt_txt)} and ${toHourLabel(sweetSlots[1]?.dt_txt)} due to mild temperatures and lower wind.`
-    )
-  } else if (p.temperature >= 18 && p.temperature <= 25) {
-    output.push('Current temperatures are in a productivity sweet spot for focused outdoor tasks.')
+  const input = {
+    temperature: Number(current?.main?.temp ?? 0),
+    precipitationProbability: Math.round(Number(hourly[0]?.pop ?? 0) * 100),
+    windSpeed: Number(current?.wind?.speed ?? 0),
+    humidity: Number(current?.main?.humidity ?? 0),
+    uvIndex: Number(current?.uvi ?? current?.uvIndex ?? 0),
+    condition: String(current?.weather?.[0]?.main || ''),
+    hourlyForecast: hourly
   }
 
-  const rainSlot = p.hourly.find((slot) => Number(slot?.pop ?? 0) * 100 > 50)
-  if (rainSlot) {
-    output.push(`Rain risk increases around ${toHourLabel(rainSlot?.dt_txt)}. Plan indoor tasks after that window.`)
-  } else if (p.rainChanceNow > 35) {
-    output.push('Rain potential is moderate today. Keep flexible indoor alternatives ready.')
-  }
-
-  if (p.uvIndex > 7) {
-    output.push('UV intensity is high. Use sun protection for any prolonged outdoor work.')
-  } else if (p.windSpeed > 30) {
-    output.push('Wind speeds are elevated and may disrupt outdoor operations or travel comfort.')
-  } else if (p.humidity >= 70) {
-    output.push('Humidity is elevated and may reduce comfort. Hydration breaks are recommended.')
-  } else if (p.impactScore < 60) {
-    output.push('Weather stability is moderate-to-low. Prioritize time-sensitive outdoor tasks earlier.')
-  }
-
-  while (output.length < 3) {
-    output.push('Conditions remain generally manageable. Keep task plans time-blocked around forecast changes.')
-  }
-
-  return output.slice(0, 3)
+  return generateForecastInsights(input)
 })
 </script>
 
 <template>
   <section class="ai-forecast-card rounded-2xl bg-white/10 backdrop-blur p-6 shadow-lg">
     <div class="card-head">
-      <h3>AI Forecast Intelligence</h3>
+      <h3><span class="brain">AI</span> AI Forecast Intelligence</h3>
       <span class="ai-icon" aria-hidden="true">AI</span>
     </div>
 
@@ -104,11 +43,21 @@ const insights = computed(() => {
       <span class="shimmer-line"></span>
       <span class="shimmer-line"></span>
       <span class="shimmer-line"></span>
+      <span class="shimmer-line"></span>
     </div>
 
-    <ul v-else class="insight-list">
-      <li v-for="(insight, idx) in insights" :key="`insight-${idx}`">{{ insight }}</li>
-    </ul>
+    <template v-else>
+      <DailyWeatherSummary
+        :summary="intelligence.summary"
+        :weather-data="weatherData"
+      />
+      <p class="insights-title">Insights:</p>
+      <ul class="insight-list">
+        <li v-for="insight in intelligence.insights" :key="insight.type">
+          {{ insight.text }}
+        </li>
+      </ul>
+    </template>
   </section>
 </template>
 
@@ -129,8 +78,20 @@ const insights = computed(() => {
 
 .card-head h3 {
   margin: 0;
-  font-size: 22px;
+  font-size: 21px;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brain {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 999px;
+  padding: 3px 7px;
+  opacity: 0.9;
 }
 
 .ai-icon {
@@ -143,11 +104,28 @@ const insights = computed(() => {
   color: rgba(255, 255, 255, 0.9);
 }
 
+:deep(.daily-weather-summary) {
+  margin: 0 0 10px 0;
+  color: rgba(255, 255, 255, 0.96);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.insights-title {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .insight-list {
   margin: 0;
   padding-left: 18px;
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .insight-list li {
