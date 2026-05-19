@@ -1,6 +1,7 @@
 import { buildWeatherCacheKey, readWeatherCache, writeWeatherCache } from '@/utils/weatherCache'
 
 const GEOCODE_URL = 'https://geocoding-api.open-meteo.com/v1/search'
+const REVERSE_GEOCODE_URL = 'https://nominatim.openstreetmap.org/reverse'
 const WEATHER_URL = 'https://api.open-meteo.com/v1/forecast'
 const CACHE_TTL_MS = 15 * 60 * 1000
 
@@ -16,13 +17,22 @@ function buildWeatherUrl(lat, lon) {
   const params = new URLSearchParams({
     latitude: lat,
     longitude: lon,
-    hourly: 'temperature_2m,relative_humidity_2m,precipitation,windspeed_10m,precipitation_probability',
+    hourly: 'temperature_2m,relative_humidity_2m,precipitation,windspeed_10m,precipitation_probability,surface_pressure',
     daily: 'temperature_2m_max,temperature_2m_min,weathercode',
     current_weather: true,
     timezone: 'auto',
     forecast_days: 7
   })
   return `${WEATHER_URL}?${params}`
+}
+
+function buildReverseGeocodeUrl(lat, lon) {
+  const params = new URLSearchParams({
+    lat,
+    lon,
+    format: 'json'
+  })
+  return `${REVERSE_GEOCODE_URL}?${params}`
 }
 
 async function parseJsonSafe(response) {
@@ -61,13 +71,33 @@ async function geocodeCity(city) {
   }
 }
 
+async function reverseGeocodeLocation(lat, lon) {
+  const response = await fetch(buildReverseGeocodeUrl(lat, lon), {
+    headers: {
+      'User-Agent': 'LumiCast/1.0'
+    }
+  })
+  const result = await response.json()
+  const address = result?.address || {}
+
+  return address.city || address.town || address.village || address.county || null
+}
+
 function transformOpenMeteo(data, lat, lon, name) {
   const currentWeather = data.current_weather
   const hourly = data.hourly
   const daily = data.daily
 
-  const humidity = hourly?.relative_humidity_2m?.[0] ?? null
-  const rainChance = hourly?.precipitation_probability?.[0] ?? 0
+  // Get current hour's index from hourly.time array
+  const now = new Date()
+  const currentHourStr = now.toISOString().slice(0, 13)
+  const currentIndex = (hourly.time || []).findIndex(t => t.startsWith(currentHourStr))
+  const idx = currentIndex >= 0 ? currentIndex : 0
+
+  const humidity = hourly?.relative_humidity_2m?.[idx] ?? null
+  const rainChance = Math.max(
+    ...(hourly?.precipitation_probability?.slice(idx, idx + 12) ?? [0])
+  ) ?? null
 
   const current = {
     dt: Date.now() / 1000,
@@ -76,7 +106,7 @@ function transformOpenMeteo(data, lat, lon, name) {
     main: {
       temp: currentWeather.temperature,
       humidity: humidity,
-      pressure: null,
+      pressure: hourly?.surface_pressure?.[idx] ?? null,
       feels_like: currentWeather.temperature, // Open-Meteo doesn't provide feels_like
       visibility: null
     },
@@ -101,7 +131,7 @@ function transformOpenMeteo(data, lat, lon, name) {
     const timestamp = Date.now() / 1000 + (i * 3600)
     const hourTemp = hourly.temperature_2m?.[i] || 0
     const hourHumidity = hourly.relative_humidity_2m?.[i] || 0
-    const hourWindSpeed = hourly.wind_speed_10m?.[i] || 0
+    const hourWindSpeed = hourly.windspeed_10m?.[i] || 0
     const hourPrecipitation = hourly.precipitation?.[i] || 0
 
     forecastList.push({
@@ -227,6 +257,12 @@ export async function fetchWeatherBundle(params, options = {}) {
     lat = parseFloat(params.lat)
     lon = parseFloat(params.lon)
     locationName = `${lat.toFixed(4)}, ${lon.toFixed(4)}`
+
+    try {
+      locationName = await reverseGeocodeLocation(lat, lon) || locationName
+    } catch (error) {
+      console.warn('[weather-api] Reverse geocode failed:', error)
+    }
   } else {
     throw new Error('Either city name (q) or coordinates (lat, lon) are required')
   }

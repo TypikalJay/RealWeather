@@ -77,25 +77,25 @@ export function generateDailySummary(
   const windyLater = lateSlots.some((slot) => toNum(slot?.wind?.speed) > 30) || wind > 30
 
   if (lateRainMax > 50 && temp >= 18 && temp <= 25) {
-    return 'A comfortable morning with increasing rain chances later today.'
+    return 'Nice morning, but rain might come later.'
   }
   if (temp >= 18 && temp <= 25 && uv > 7) {
-    return 'Mild and productive conditions dominate today, with elevated UV around midday.'
+    return 'Nice day, but the sun gets strong midday.'
   }
   if (temp > 26 && uv > 7) {
-    return 'Warm and sunny conditions dominate today with elevated UV exposure.'
+    return 'Warm and sunny. The sun is strong today.'
   }
   if (windyLater || wind > 30) {
-    return 'Breezy to windy conditions may reduce outdoor comfort as the day progresses.'
+    return 'It gets windy. Might be hard to be outside.'
   }
   if (lateRainMax > 50) {
-    return 'Conditions are manageable early, but rain risk increases later in the day.'
+    return 'Start is fine, but rain might come later.'
   }
   if (temp < 14) {
-    return 'Cool temperatures are expected today, so outdoor comfort may be lower than usual.'
+    return 'It stays cool. Bundle up if going out.'
   }
 
-  return 'Stable weather is expected today with mostly manageable conditions for planned activities.'
+  return 'Weather looks fine today. Good for most plans.'
 }
 
 export function generateForecastInsights(
@@ -141,10 +141,10 @@ export function generateForecastInsights(
   }
 
   const productivityText = bestWindow
-    ? `Productivity window: ${bestWindow.start}-${bestWindow.end} offers the best outdoor focus period with balanced temperature and low rain risk.`
+    ? `Best time: ${bestWindow.start}-${bestWindow.end} is great for getting things done outside.`
     : temp >= 18 && temp <= 25 && rainNow < 30
-      ? 'Productivity window: Current conditions are favorable for outdoor work; prioritize high-value tasks in the next few hours.'
-      : 'Productivity window: Conditions are mixed, so front-load essential outdoor tasks into the driest available hours.'
+      ? 'Best time: Now is good for outdoor work. Do important tasks soon.'
+      : 'Best time: Mix of conditions. Do outdoor tasks when it driest.'
 
   const firstRainRiskSlot = hourly.find((slot) => toPercent(slot?.pop) > 50)
   const windySlot = hourly.find((slot) => toNum(slot?.wind?.speed) > 30)
@@ -154,40 +154,40 @@ export function generateForecastInsights(
     condition.includes('snow')
 
   let warningText =
-    'Weather disruption warning: No major disruption signal right now; continue with normal plan sequencing.'
+    'Weather heads-up: No big issues right now. Keep your plans.'
   if (firstRainRiskSlot || rainNow > 50) {
     const atTime = firstRainRiskSlot
       ? ` around ${toHourLabel(firstRainRiskSlot.dt_txt || firstRainRiskSlot.dt)}`
       : ''
-    warningText = `Weather disruption warning: Rain probability exceeds 50%${atTime}. Complete outdoor tasks earlier and shift indoor work later.`
+    warningText = `Weather heads-up: Rain chance is high${atTime}. Do outdoor tasks early. Move inside later.`
   } else if (uv > 7) {
     warningText =
-      'Weather disruption warning: UV index is high (>7). Reduce unprotected midday exposure and schedule shade breaks.'
+      'Weather heads-up: The sun is strong. Stay in shade midday.'
   } else if (windySlot || wind > 30) {
     warningText =
-      'Weather disruption warning: Wind speed is above 30 km/h. Expect outdoor instability and secure light equipment.'
+      'Weather heads-up: It is very windy. Secure loose items outside.'
   } else if (severeCondition) {
     warningText =
-      'Weather disruption warning: Unstable weather pattern detected. Keep contingency time for sudden condition shifts.'
+      'Weather heads-up: Storms might happen. Have backup plans ready.'
   }
 
   let comfortText =
-    'Comfort insight: Overall comfort is moderate, with no strong thermal stress signal at the moment.'
+    'Comfort tip: Feels okay right now. No big comfort issues.'
   if (humidity >= 70) {
     comfortText =
-      'Comfort insight: Humidity is elevated and may reduce comfort; hydration and shorter outdoor intervals are recommended.'
+      'Comfort tip: It is quite humid. Drink water and take breaks.'
   } else if (uv > 7) {
     comfortText =
-      'Comfort insight: Strong UV can increase heat strain; wear sun protection if active outdoors.'
+      'Comfort tip: The sun is strong. Wear sunscreen if outside.'
   } else if (temp > 30) {
     comfortText =
-      'Comfort insight: Temperatures are high, so plan cooling breaks and avoid peak exertion periods.'
+      'Comfort tip: It is very hot. Take cool breaks often.'
   } else if (temp < 10) {
     comfortText =
-      'Comfort insight: Cool conditions may impact comfort and dexterity; layered clothing is recommended.'
+      'Comfort tip: It is cold. Wear layers to stay warm.'
   } else if (humidity <= 35) {
     comfortText =
-      'Comfort insight: Air is relatively dry; hydration helps maintain focus for longer activity blocks.'
+      'Comfort tip: Air is dry. Drink water to stay focused.'
   }
 
   return {

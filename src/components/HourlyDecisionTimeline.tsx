@@ -83,20 +83,20 @@ export default defineComponent({
         const temp = toNumber(slot?.main?.temp, 0)
         const humidity = toNumber(slot?.main?.humidity, toNumber((current as any)?.main?.humidity, 50))
         const wind = toNumber(slot?.wind?.speed, toNumber((current as any)?.wind?.speed, 0))
-        const rainProbability = Math.round(toNumber(slot?.pop, 0) * 100)
+        const rainProbability = Math.round(toNumber(slot?.pop, 0))
         const uv = toNumber(slot?.uvi, currentUv)
         const condition = String(slot?.weather?.[0]?.main || '')
         const comfortScore = computeComfortScore(temp, humidity, wind)
 
-        let recommendation = 'Comfortable conditions'
+        let recommendation = 'Great time to go outside!'
         if (rainProbability > 50) {
-          recommendation = 'Rain likely - indoor activities recommended'
+          recommendation = 'Stay indoors if possible.'
         } else if (uv > 7) {
-          recommendation = 'High UV exposure - sun protection recommended'
+          recommendation = 'The sun is strong. Stay in shade.'
         } else if (wind > 30) {
-          recommendation = 'Windy conditions - limit exposed outdoor tasks'
+          recommendation = "It's windy out. Stay sheltered if you can."
         } else if (temp < 18 || temp > 25 || comfortScore < 65) {
-          recommendation = 'Mixed comfort - plan shorter outdoor blocks'
+          recommendation = 'Not the best outside. Keep trips short.'
         }
 
         return {

@@ -78,7 +78,8 @@ const visibilityKm = computed(() => {
 
 const rainChance = computed(() => {
   const chance = props.currentWeather?.rain?.chance
-  return chance !== undefined ? `${Math.round(chance)}%` : 'N/A'
+  if (chance === null || chance === undefined) return 'N/A'
+  return `${Math.round(chance)}%`
 })
 
 const humidity = computed(() => {
@@ -111,8 +112,9 @@ function trendArrow(value) {
     <h3>Current Weather</h3>
     
     <div class="weather-content">
-      <!-- Main Section: Icon, Temperature, Condition, Coordinates -->
       <div class="weather-main">
+        <div class="city-name">{{ currentWeather?.name ?? 'Unknown' }}</div>
+
         <div class="weather-icon">
           <div 
             class="icon main-weather-icon"
@@ -121,17 +123,17 @@ function trendArrow(value) {
           ></div>
         </div>
         
-        <div class="temperature-info">
-          <div class="temp-display">
-            {{ toDisplayTemp(currentWeather?.main?.temp ?? 0) }}&deg;{{ unitSymbol }}
-            <span class="trend-arrow">{{ trendArrow(trendIndicators.temperature) }}</span>
-          </div>
-          <div class="location-info">
-            <div class="city-name">{{ currentWeather?.name ?? 'Unknown' }}</div>
-            <div class="coordinates">
-              {{ currentWeather?.coord?.lat?.toFixed(2) ?? '0.00' }}, {{ currentWeather?.coord?.lon?.toFixed(2) ?? '0.00' }}
-            </div>
-          </div>
+        <div class="temp-display">
+          {{ toDisplayTemp(currentWeather?.main?.temp ?? 0) }}&deg;{{ unitSymbol }}
+          <span class="trend-arrow">{{ trendArrow(trendIndicators.temperature) }}</span>
+        </div>
+
+        <div class="condition-description">
+          {{ capitalize(currentWeather?.weather?.[0]?.description ?? 'clear sky') }}
+        </div>
+
+        <div class="feels-like">
+          Feels like {{ toDisplayTemp(currentWeather?.main?.feels_like ?? currentWeather?.main?.temp ?? 0) }}&deg;{{ unitSymbol }}
         </div>
       </div>
       
@@ -146,12 +148,12 @@ function trendArrow(value) {
           <span class="stat-value">{{ windDisplay }}</span>
         </div>
         <div class="stat-item">
-          <span class="stat-label">Feels Like</span>
-          <span class="stat-value">{{ toDisplayTemp(currentWeather?.main?.feels_like ?? currentWeather?.main?.temp ?? 0) }}&deg;{{ unitSymbol }}</span>
-        </div>
-        <div class="stat-item">
           <span class="stat-label">Pressure</span>
           <span class="stat-value">{{ pressure }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Rain Chance Today</span>
+          <span class="stat-value">{{ rainChance }}</span>
         </div>
       </div>
     </div>
@@ -164,19 +166,18 @@ function trendArrow(value) {
   flex-direction: column;
   justify-content: space-between;
   height: 100%;
-  transition: box-shadow 0.3s ease;
 }
 
 .current-weather-card.rain {
-  box-shadow: 0 0 40px rgba(0, 150, 255, 0.25);
+  box-shadow: 0 8px 18px rgba(0, 150, 255, 0.08);
 }
 
 .current-weather-card.clear {
-  box-shadow: 0 0 40px rgba(255, 200, 80, 0.25);
+  box-shadow: 0 8px 18px rgba(255, 200, 80, 0.08);
 }
 
 .current-weather-card.storm {
-  box-shadow: 0 0 40px rgba(168, 85, 247, 0.22), 0 0 56px rgba(239, 68, 68, 0.18);
+  box-shadow: 0 8px 18px rgba(168, 85, 247, 0.08);
 }
 
 .current-weather-card h3 {
@@ -189,16 +190,17 @@ function trendArrow(value) {
 .weather-content {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  flex: 1;
-  gap: 20px;
+  align-items: center;
+  gap: 24px;
 }
 
 .weather-main {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
+  gap: 8px;
+  min-width: 0;
+  text-align: center;
 }
 
 .weather-icon {
@@ -206,42 +208,30 @@ function trendArrow(value) {
   justify-content: center;
   align-items: center;
   flex-shrink: 0;
-  width: 100%;
 }
 
 .weather-icon .icon {
-  width: 88px;
-  height: 88px;
+  width: 150px;
+  height: 130px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .weather-icon :deep(.main-weather-icon svg) {
-  width: 315px;
-  height: 237px;
+  width: 190px;
+  height: 150px;
   display: block;
   margin: 0 auto;
 }
 
-.temperature-info {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex: 1;
-  min-width: 0;
-  margin-top: 1em;
-  text-align: center;
-}
-
 .temp-display {
-  font-size: 44px;
-  font-weight: 600;
+  font-size: clamp(28px, 8vw, 44px);
+  font-weight: 800;
   color: white;
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 4px;
   line-height: 1;
   letter-spacing: 0.5px;
 }
@@ -251,21 +241,24 @@ function trendArrow(value) {
   color: rgba(255, 255, 255, 0.6);
 }
 
-.location-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.city-name {
+  font-size: clamp(16px, 4vw, 20px);
+  line-height: 1.2;
+  font-weight: 700;
+  color: white;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
-.city-name {
-  font-size: 16px;
+.condition-description {
+  font-size: 15px;
   font-weight: 600;
   color: white;
-  opacity: 0.8;
 }
 
-.coordinates {
-  font-size: 12px;
+.feels-like {
+  font-size: 13px;
+  font-weight: 500;
   color: rgba(255, 255, 255, 0.6);
 }
 
@@ -273,13 +266,17 @@ function trendArrow(value) {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
+  align-content: center;
+  min-width: 0;
 }
 
 .stat-item {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto 1fr;
   align-items: flex-start;
-  padding: 12px;
+  gap: 8px;
+  min-height: 112px;
+  padding: 16px;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 10px;
@@ -288,38 +285,47 @@ function trendArrow(value) {
 .stat-label {
   font-size: 12px;
   color: rgba(255, 255, 255, 0.7);
-  margin-bottom: 6px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.06em;
 }
 
 .stat-value {
-  font-size: 16px;
+  align-self: end;
+  font-size: 15px;
   font-weight: 600;
   color: white;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 600px) {
+  .weather-content {
+    gap: 16px;
+  }
+
   .weather-icon .icon {
-    width: 72px;
-    height: 72px;
+    width: min(120px, 42vw);
+    height: 104px;
   }
 
   .weather-icon :deep(.main-weather-icon svg) {
-    width: 180px;
-    height: 135px;
+    width: min(160px, 54vw);
+    height: 126px;
   }
   
   .temp-display {
-    font-size: 28px;
+    font-size: clamp(28px, 8vw, 44px);
   }
   
   .city-name {
-    font-size: 18px;
+    font-size: clamp(16px, 4vw, 20px);
   }
   
   .stats-grid {
     gap: 8px;
+  }
+
+  .stat-item {
+    min-height: 96px;
+    padding: 12px;
   }
 }
 </style>

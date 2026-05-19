@@ -153,7 +153,8 @@ export function normalizeWeather(rawCurrent = {}, rawForecast = {}) {
       all: toNumber(rawCurrent?.clouds?.all)
     },
     rain: {
-      '1h': toNullableNumber(rawCurrent?.rain?.['1h'])
+      '1h': toNullableNumber(rawCurrent?.rain?.['1h']),
+      chance: toNullableNumber(rawCurrent?.rain?.chance)
     },
     snow: {
       '1h': toNullableNumber(rawCurrent?.snow?.['1h'])

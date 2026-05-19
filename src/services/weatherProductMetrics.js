@@ -24,7 +24,7 @@ export function calculateImpactScore(normalizedWeather) {
   const temp = toNumber(current.main?.temp)
   const humidity = toNumber(current.main?.humidity)
   const windSpeed = toNumber(current.wind?.speed)
-  const rainChance = toNumber(current.rain?.chance || 0) * 100
+  const rainChance = toNumber(current.rain?.chance || 0)
   const visibility = toNumber(current.main?.visibility) / 1000 // Convert to km
   const condition = String(current.weather?.[0]?.main || '').toLowerCase()
 
@@ -32,7 +32,7 @@ export function calculateImpactScore(normalizedWeather) {
   let score = 100
 
   // Rain penalty
-  score -= rainChance * 0.4
+  score -= (rainChance / 100) * 0.4
 
   // Temperature comfort penalty (22°C ideal)
   score -= Math.abs(temp - 22) * 1.5

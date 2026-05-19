@@ -137,11 +137,11 @@ function estimateImpactFromSlot(slot) {
   const windSpeed = Number(slot?.wind?.speed ?? 0)
   const humidity = Number(slot?.main?.humidity ?? 0)
   const visibility = Number(slot?.visibility ?? 10000) / 1000
-  const rainChance = Number(slot?.pop ?? 0) * 100
+  const rainChance = Number(slot?.pop ?? 0)
   const condition = String(slot?.weather?.[0]?.main || '').toLowerCase()
 
   let score = 100
-  score -= rainChance * 0.4
+  score -= (rainChance / 100) * 0.4
   score -= Math.abs(temp - 22) * 1.5
   if (windSpeed > 20) score -= 10
   if (visibility < 5) score -= 15
@@ -336,7 +336,7 @@ const trendLinePoints = computed(() =>
   line-height: 1;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 600px) {
   .impact-content {
     flex-direction: column;
     gap: 16px;
@@ -353,6 +353,16 @@ const trendLinePoints = computed(() =>
   .ring-svg {
     width: 120px;
     height: 120px;
+  }
+
+  .factors-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .factor-chip {
+    min-height: 44px;
+    height: auto;
+    padding: 12px;
   }
 }
 </style>

@@ -93,7 +93,7 @@ function getWeatherIcon(condition) {
 
 .forecast-row {
   display: grid;
-  grid-template-columns: repeat(7, minmax(110px, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 16px;
   align-items: start;
 }
@@ -108,13 +108,8 @@ function getWeatherIcon(condition) {
   padding: 6px 4px;
 }
 
-.forecast-card {
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
-}
-
 .forecast-card:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
 }
 
 .day-name {
@@ -167,10 +162,10 @@ function getWeatherIcon(condition) {
   text-transform: lowercase;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 600px) {
   .forecast-row {
-    grid-template-columns: repeat(2, minmax(120px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
   }
 
   .day-name {
@@ -191,14 +186,13 @@ function getWeatherIcon(condition) {
   }
 
   .day-condition {
-    font-size: 0.9rem;
+    font-size: 0.72rem;
   }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 380px) {
   .forecast-row {
-    grid-template-columns: repeat(1, minmax(0, 1fr));
-    gap: 10px;
+    gap: 8px;
   }
 
   .day-name {
@@ -219,7 +213,7 @@ function getWeatherIcon(condition) {
   }
 
   .day-condition {
-    font-size: 0.82rem;
+    font-size: 0.68rem;
   }
 }
 </style>

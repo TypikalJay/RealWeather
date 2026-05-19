@@ -49,7 +49,7 @@
             <span class="trend-icon">🌧️</span>
             <span class="trend-name">Rain Chance</span>
           </div>
-          <div class="trend-value">{{ Math.round((currentWeather?.rain?.chance || 0) * 100) }}%</div>
+          <div class="trend-value">{{ Math.round(currentWeather?.rain?.chance || 0) }}%</div>
           <div class="trend-change">
             <span class="trend-arrow">{{ getTrendArrow(trendIndicators.rainChance) }}</span>
             <span class="trend-amount">{{ getTrendAmount(trendIndicators.rainChance, 'rain') }}</span>

@@ -12,7 +12,7 @@
           <div class="hour-time">{{ formatHour(hour.dt_txt) }}</div>
           <div class="hour-icon" v-html="iconSvg(hour.weather?.[0]?.main || 'Clear')"></div>
           <div class="hour-temp">{{ toDisplayTemp(hour.main?.temp ?? 0) }}&deg;</div>
-          <div class="hour-rain">{{ Math.round((hour.pop ?? 0) * 100) }}%</div>
+          <div class="hour-rain">{{ Math.round(hour.pop ?? 0) }}%</div>
         </div>
       </div>
     </div>
@@ -62,6 +62,7 @@ const props = defineProps({
   flex: 1;
   overflow-x: auto;
   overflow-y: hidden;
+  max-width: 100%;
 }
 
 .hours-grid {
@@ -80,13 +81,11 @@ const props = defineProps({
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 10px;
-  transition: all 0.2s ease;
   min-width: 70px;
 }
 
 .hour-item:hover {
   background: rgba(255, 255, 255, 0.12);
-  transform: translateY(-2px);
 }
 
 .hour-time {
@@ -123,24 +122,14 @@ const props = defineProps({
 
 /* Scrollbar styling */
 .hours-container::-webkit-scrollbar {
-  height: 4px;
+  display: none;
 }
 
-.hours-container::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 2px;
+.hours-container {
+  scrollbar-width: none;
 }
 
-.hours-container::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 2px;
-}
-
-.hours-container::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
-}
-
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .hours-grid {
     grid-template-columns: repeat(12, minmax(50px, 1fr));
     gap: 6px;
@@ -168,14 +157,22 @@ const props = defineProps({
   }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 600px) {
+  .next-12-hours h3 {
+    font-size: 16px;
+    margin-bottom: 14px;
+  }
+
   .hours-grid {
-    grid-template-columns: repeat(12, minmax(45px, 1fr));
-    gap: 4px;
+    grid-template-columns: repeat(12, calc((100% - 16px) / 3));
+    gap: 8px;
+    min-width: max-content;
   }
   
   .hour-item {
-    padding: 4px 2px;
+    min-width: 0;
+    min-height: 44px;
+    padding: 8px 4px;
   }
 }
 </style>
